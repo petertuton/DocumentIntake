@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DocumentIntake.Functions/DocumentIntake.Functions.csproj" />
+    <Project Path="src/DocumentIntake.Tests/DocumentIntake.Tests.csproj" />
+  </Folder>
+</Solution>

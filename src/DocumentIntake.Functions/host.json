@@ -1,0 +1,23 @@
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": true,
+        "excludedTypes": "Request;Exception"
+      }
+    },
+    "logLevel": {
+      "default": "Information",
+      "DurableTask.Core": "Warning",
+      "Host.Triggers.DurableTask": "Information"
+    }
+  },
+  "extensions": {
+    "durableTask": {
+      "hubName": "DocumentIntakeHub",
+      "maxConcurrentActivityFunctions": 10,
+      "maxConcurrentOrchestratorFunctions": 10
+    }
+  }
+}

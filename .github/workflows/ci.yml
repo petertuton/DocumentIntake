@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore DocumentIntake.slnx
+
+      - name: Build
+        run: dotnet build DocumentIntake.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test DocumentIntake.slnx --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+          if-no-files-found: ignore
+
+  bicep:
+    name: Lint Bicep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bicep
+        run: |
+          az bicep install
+          az bicep version
+
+      - name: Build main.bicep
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
+      - name: Lint all modules
+        run: |
+          status=0
+          for file in infra/core/*.bicep; do
+            echo "::group::$file"
+            az bicep build --file "$file" --stdout > /dev/null || status=1
+            echo "::endgroup::"
+          done
+          exit $status

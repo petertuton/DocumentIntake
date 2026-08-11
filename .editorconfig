@@ -1,0 +1,33 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,csx}]
+indent_size = 4
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:warning
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = true:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+
+# High-performance logging source generators are overkill for this workload.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+
+# Test projects: xUnit conventions differ from library guidance.
+[src/DocumentIntake.Tests/**.cs]
+# Underscored test names (Method_Scenario_Expectation) are the convention here.
+dotnet_diagnostic.CA1707.severity = none
+# xUnit discovers public test classes; they are not a public API surface.
+dotnet_diagnostic.CA1515.severity = none
+
+[*.{json,jsonc,yml,yaml,bicep,bicepparam}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

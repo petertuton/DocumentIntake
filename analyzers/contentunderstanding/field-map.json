@@ -1,0 +1,20 @@
+{
+  "$comment": "Maps Content Understanding field names to the column names used by the target form/table. Fields not listed here are ignored by the mapping activity.",
+  "formType": "known-form",
+  "columns": {
+    "FormNumber": "new_formnumber",
+    "SubmissionDate": "new_submissiondate",
+    "CustomerName": "new_customername",
+    "CustomerReference": "new_customerreference",
+    "EmailAddress": "new_emailaddress",
+    "PhoneNumber": "new_phonenumber",
+    "AddressLine1": "new_addressline1",
+    "AddressLine2": "new_addressline2",
+    "City": "new_city",
+    "StateOrProvince": "new_stateorprovince",
+    "PostalCode": "new_postalcode",
+    "TotalAmount": "new_totalamount",
+    "Currency": "new_currency",
+    "SignaturePresent": "new_signaturepresent"
+  }
+}

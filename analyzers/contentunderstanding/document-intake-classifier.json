@@ -1,0 +1,15 @@
+{
+  "description": "Classifies inbound email attachments as a known intake form or as unknown content.",
+  "tags": {
+    "project": "document-intake"
+  },
+  "categories": {
+    "known-form": {
+      "description": "The single known intake form handled by this workflow. It contains a form header, an applicant/customer section, and a totals section."
+    },
+    "unknown": {
+      "description": "Any other document: correspondence, signatures pages, marketing material, scanned notes, or unrelated forms."
+    }
+  },
+  "splitMode": "none"
+}
