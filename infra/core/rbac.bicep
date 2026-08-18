@@ -10,9 +10,16 @@ param functionAppPrincipalId string
 @description('Principal id of the Logic App managed identity.')
 param logicAppPrincipalId string
 
+@description('Principal id of the jump box VM managed identity. Leave empty when the jump box is not deployed.')
+param jumpboxPrincipalId string = ''
+
 var storageBlobDataContributor = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+)
+var storageBlobDataReader = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
 )
 var storageQueueDataContributor = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
@@ -21,10 +28,6 @@ var storageQueueDataContributor = subscriptionResourceId(
 var storageTableDataContributor = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
-)
-var storageBlobDataOwner = subscriptionResourceId(
-  'Microsoft.Authorization/roleDefinitions',
-  'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
 )
 var cognitiveServicesUser = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
@@ -42,9 +45,9 @@ resource foundry 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
 // Function App: read/write documents, plus the queues and tables Durable Functions needs.
 resource fnBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: storage
-  name: guid(storage.id, functionAppPrincipalId, storageBlobDataOwner)
+  name: guid(storage.id, functionAppPrincipalId, storageBlobDataContributor)
   properties: {
-    roleDefinitionId: storageBlobDataOwner
+    roleDefinitionId: storageBlobDataContributor
     principalId: functionAppPrincipalId
     principalType: 'ServicePrincipal'
   }
@@ -84,9 +87,9 @@ resource fnFoundry 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // Foundry reads the source document straight from the blob url supplied by the Function.
 resource foundryBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: storage
-  name: guid(storage.id, foundry.id, storageBlobDataContributor)
+  name: guid(storage.id, foundry.id, storageBlobDataReader)
   properties: {
-    roleDefinitionId: storageBlobDataContributor
+    roleDefinitionId: storageBlobDataReader
     principalId: foundry.identity.principalId
     principalType: 'ServicePrincipal'
   }
@@ -99,6 +102,17 @@ resource logicBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     roleDefinitionId: storageBlobDataContributor
     principalId: logicAppPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Jump box VM: lets az storage commands run over the private endpoints for manual verification.
+resource jumpboxBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(jumpboxPrincipalId)) {
+  scope: storage
+  name: guid(storage.id, jumpboxPrincipalId, storageBlobDataContributor)
+  properties: {
+    roleDefinitionId: storageBlobDataContributor
+    principalId: jumpboxPrincipalId
     principalType: 'ServicePrincipal'
   }
 }

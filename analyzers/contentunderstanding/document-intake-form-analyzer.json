@@ -1,6 +1,6 @@
 {
-  "description": "Extracts fields from the known document intake form using OCR.",
-  "baseAnalyzerId": "prebuilt-documentAnalyzer",
+  "description": "Extracts Virginia DMAS HIPP application fields from classified documents using OCR, layout analysis, and source confidence.",
+  "baseAnalyzerId": "prebuilt-document",
   "tags": {
     "project": "document-intake"
   },
@@ -11,78 +11,138 @@
     "estimateFieldSourceAndConfidence": true
   },
   "fieldSchema": {
-    "name": "DocumentIntakeForm",
-    "description": "Fields captured from the known intake form.",
+    "name": "HippApplication",
+    "description": "Fields captured from a Virginia DMAS HIPP application or HIPP correspondence form.",
     "fields": {
-      "FormNumber": {
+      "ApplicationId": {
         "type": "string",
         "method": "extract",
-        "description": "The form identifier printed on the document, usually in the header."
+        "description": "The HIPP application identifier, usually printed near the form heading."
       },
-      "SubmissionDate": {
+      "CorrespondenceType": {
+        "type": "string",
+        "method": "extract",
+        "description": "The selected HIPP correspondence type: New HIPP application, Quarterly Paystub Submission, Annual HIPP Renewal, or Information change."
+      },
+      "HippNumber": {
+        "type": "string",
+        "method": "extract",
+        "description": "The five-digit HIPP number, when present."
+      },
+      "PolicyholderFirstName": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder or employee first name."
+      },
+      "PolicyholderMiddleInitial": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder or employee middle initial."
+      },
+      "PolicyholderLastName": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder or employee last name."
+      },
+      "PolicyholderDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "The date the form was completed or signed."
+        "description": "Policyholder or employee date of birth."
       },
-      "CustomerName": {
-        "type": "string",
-        "method": "extract",
-        "description": "Full name of the customer or applicant."
-      },
-      "CustomerReference": {
-        "type": "string",
-        "method": "extract",
-        "description": "Customer account, reference, or policy number."
-      },
-      "EmailAddress": {
-        "type": "string",
-        "method": "extract",
-        "description": "Contact email address supplied on the form."
-      },
-      "PhoneNumber": {
-        "type": "string",
-        "method": "extract",
-        "description": "Contact telephone number supplied on the form."
-      },
-      "AddressLine1": {
-        "type": "string",
-        "method": "extract",
-        "description": "First line of the postal address."
-      },
-      "AddressLine2": {
-        "type": "string",
-        "method": "extract",
-        "description": "Second line of the postal address, if present."
-      },
-      "City": {
-        "type": "string",
-        "method": "extract",
-        "description": "City or suburb of the postal address."
-      },
-      "StateOrProvince": {
-        "type": "string",
-        "method": "extract",
-        "description": "State, province, or region of the postal address."
-      },
-      "PostalCode": {
-        "type": "string",
-        "method": "extract",
-        "description": "Postal or ZIP code of the postal address."
-      },
-      "TotalAmount": {
-        "type": "number",
-        "method": "extract",
-        "description": "Total monetary amount declared on the form."
-      },
-      "Currency": {
-        "type": "string",
-        "method": "extract",
-        "description": "Currency code or symbol associated with the total amount."
-      },
-      "SignaturePresent": {
+      "PolicyholderGetsMedicaid": {
         "type": "boolean",
-        "method": "generate",
-        "description": "True when a handwritten or digital signature appears in the signature block."
+        "method": "extract",
+        "description": "Whether the policyholder receives Medicaid."
+      },
+      "PolicyholderMedicaidId": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder Medicaid identification number."
+      },
+      "PolicyholderGetsMedicare": {
+        "type": "boolean",
+        "method": "extract",
+        "description": "Whether the policyholder receives Medicare."
+      },
+      "PolicyholderHomePhoneNumber": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder home telephone number."
+      },
+      "PolicyholderCellNumber": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder cell telephone number."
+      },
+      "PolicyholderStreetAddress": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder street address."
+      },
+      "PolicyholderCity": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder city."
+      },
+      "PolicyholderState": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder state abbreviation."
+      },
+      "PolicyholderZipCode": {
+        "type": "string",
+        "method": "extract",
+        "description": "Policyholder ZIP code."
+      },
+      "EmployeeStatus": {
+        "type": "string",
+        "method": "extract",
+        "description": "Employment status shown in the HIPP employment section."
+      },
+      "EmployerCompanyName": {
+        "type": "string",
+        "method": "extract",
+        "description": "Employer company name."
+      },
+      "EmployerSubscriberInsurancePolicyNumber": {
+        "type": "string",
+        "method": "extract",
+        "description": "Employer subscriber insurance policy number."
+      },
+      "InsurancePlanType": {
+        "type": "string",
+        "method": "extract",
+        "description": "Insurance plan type."
+      },
+      "InsuranceEffectiveDate": {
+        "type": "date",
+        "method": "extract",
+        "description": "Effective date of the employer insurance coverage."
+      },
+      "MedicalCarrierName": {
+        "type": "string",
+        "method": "extract",
+        "description": "Medical insurance company name."
+      },
+      "MedicalGroupNumber": {
+        "type": "string",
+        "method": "extract",
+        "description": "Medical insurance group number."
+      },
+      "MedicalPolicyNumber": {
+        "type": "string",
+        "method": "extract",
+        "description": "Medical insurance policy number."
+      },
+      "AgreementTrueAccurateInformation": {
+        "type": "boolean",
+        "method": "extract",
+        "description": "Whether the applicant agreed that the information is true and accurate."
+      },
+      "AgreementFormStatusComplete": {
+        "type": "boolean",
+        "method": "extract",
+        "description": "Whether the HIPP application form is marked complete."
       }
     }
   }

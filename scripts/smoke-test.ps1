@@ -9,7 +9,7 @@
     the lifecycle containers until the blob appears in a terminal one.
 
 .EXAMPLE
-    ./scripts/smoke-test.ps1 -File ./samples/known-form.pdf
+    ./scripts/smoke-test.ps1 -File ./samples/hipp-application.pdf
 #>
 [CmdletBinding()]
 param(

@@ -1,5 +1,9 @@
 # Runbook
 
+> The storage account only accepts private endpoint traffic. Run the `az storage` commands below
+> from the jump box described in [manual-setup.md](./manual-setup.md#0-reaching-private-endpoint-only-storage-with-az-cli),
+> or from anything else already on the VNet.
+
 ## Quick triage
 
 A file in `failed` is the signal that something went wrong. Its `intakeReason` metadata carries

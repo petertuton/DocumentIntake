@@ -2,6 +2,7 @@ using System.Text.Json;
 using Azure.Core;
 using Azure.Identity;
 using Azure.Storage.Blobs;
+using DurableFunctionsMonitor.DotNetIsolated;
 using DocumentIntake.Functions.Options;
 using DocumentIntake.Functions.Services;
 using Microsoft.Azure.Functions.Worker;
@@ -12,7 +13,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 var host = new HostBuilder()
-    .ConfigureFunctionsWebApplication()
+    .ConfigureFunctionsWebApplication(workerAppBuilder =>
+    {
+        workerAppBuilder.UseDurableFunctionsMonitor((settings, _) =>
+        {
+            settings.Mode = DfmMode.ReadOnly;
+        });
+    })
     .ConfigureServices((context, services) =>
     {
         services.AddApplicationInsightsTelemetryWorkerService();

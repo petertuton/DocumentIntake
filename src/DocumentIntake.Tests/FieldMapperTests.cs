@@ -60,6 +60,46 @@ public sealed class FieldMapperTests
     }
 
     [Fact]
+    public void Map_FlattensNestedContentUnderstandingObjects()
+    {
+        var columns = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["ApplicationId"] = "hipp_applicationid",
+            ["Policyholder.FirstName"] = "hipp_policyholderfirstname",
+        };
+        var mapper = new FieldMapper(columns, NullLogger<FieldMapper>.Instance);
+        const string payload = """
+        {
+          "result": {
+            "contents": [{
+              "fields": {
+                "ApplicationId": { "valueString": "SYN-2026-0001", "confidence": 0.82 },
+                "Policyholder": {
+                  "type": "object",
+                  "valueObject": {
+                    "FirstName": {
+                      "valueString": "Jordan",
+                      "confidence": 0.969,
+                      "source": "D(2,4.5,2.8,4.9,2.8,4.9,3.0,4.5,3.0)"
+                    }
+                  }
+                }
+              }
+            }]
+          }
+        }
+        """;
+
+        var mapped = mapper.Map(payload);
+
+        Assert.Equal("SYN-2026-0001", mapped.Single(f => f.Column == "hipp_applicationid").Value);
+        var firstName = mapped.Single(f => f.Column == "hipp_policyholderfirstname");
+        Assert.Equal("Jordan", firstName.Value);
+        Assert.Equal(0.969, firstName.Confidence, 3);
+        Assert.NotNull(firstName.BoundingBox);
+    }
+
+    [Fact]
     public void Map_IgnoresFieldsWithNoColumnMapping()
     {
         const string payload = """

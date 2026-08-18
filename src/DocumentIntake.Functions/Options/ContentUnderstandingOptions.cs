@@ -6,11 +6,11 @@ public sealed class ContentUnderstandingOptions
 
     public string Endpoint { get; set; } = string.Empty;
     public string ApiVersion { get; set; } = "2025-11-01";
-    public string ClassifierId { get; set; } = "document-intake-classifier";
-    public string AnalyzerId { get; set; } = "document-intake-form-analyzer";
+    public string ClassifierId { get; set; } = "document_intake_classifier";
+    public string AnalyzerId { get; set; } = "document_intake_form_analyzer";
 
-    /// <summary>Category emitted by the classifier for the single known form.</summary>
-    public string KnownFormCategory { get; set; } = "known-form";
+    /// <summary>Category emitted by the classifier for an HIPP application.</summary>
+    public string KnownFormCategory { get; set; } = "hipp-application";
 
     /// <summary>Classifications below this confidence are treated as unknown.</summary>
     public double MinimumClassificationConfidence { get; set; } = 0.6;

@@ -21,4 +21,7 @@ public static class Containers
         Completed,
         Failed,
     ];
+
+    /// <summary>Containers whose blobs may be served to callers outside the pipeline.</summary>
+    public static IReadOnlyList<string> PublicViewable { get; } = [Completed];
 }

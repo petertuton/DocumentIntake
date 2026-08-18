@@ -108,6 +108,34 @@ public sealed class BlobRouter : IBlobRouter
         return response.Value.Content;
     }
 
+    public async Task<BlobContent?> DownloadWithPropertiesAsync(
+        BlobReference reference,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        var blob = _client.GetBlobContainerClient(reference.ContainerName).GetBlobClient(reference.BlobName);
+
+        try
+        {
+            var response = await blob.DownloadContentAsync(cancellationToken).ConfigureAwait(false);
+            var details = response.Value.Details;
+            var contentType = string.IsNullOrWhiteSpace(details.ContentType)
+                ? "application/octet-stream"
+                : details.ContentType;
+
+            return new BlobContent(
+                response.Value.Content,
+                contentType,
+                GetFileName(reference.BlobName),
+                details.ContentLength,
+                details.ETag.ToString());
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
+    }
+
     public Uri GetBlobUri(BlobReference reference)
     {
         ArgumentNullException.ThrowIfNull(reference);
@@ -141,5 +169,11 @@ public sealed class BlobRouter : IBlobRouter
         var chars = key.Select(c => char.IsLetterOrDigit(c) || c == '_' ? c : '_').ToArray();
         var sanitized = new string(chars);
         return char.IsDigit(sanitized[0]) ? "_" + sanitized : sanitized;
+    }
+
+    private static string GetFileName(string blobName)
+    {
+        var lastSlash = blobName.LastIndexOf('/');
+        return lastSlash >= 0 ? blobName[(lastSlash + 1)..] : blobName;
     }
 }

@@ -22,3 +22,14 @@ hooks:
       run: pwsh ./scripts/register-analyzers.ps1
       interactive: false
       continueOnError: true
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: ./scripts/register-event-subscription.ps1
+      interactive: false
+      continueOnError: true
+    posix:
+      shell: sh
+      run: pwsh ./scripts/register-event-subscription.ps1
+      interactive: false
+      continueOnError: true

@@ -19,6 +19,9 @@ public interface IBlobRouter
     /// <summary>Downloads the blob content.</summary>
     Task<BinaryData> DownloadAsync(BlobReference reference, CancellationToken cancellationToken = default);
 
+    /// <summary>Downloads the blob with the properties needed to serve it over HTTP, or null when it does not exist.</summary>
+    Task<BlobContent?> DownloadWithPropertiesAsync(BlobReference reference, CancellationToken cancellationToken = default);
+
     /// <summary>Absolute URL of a blob (no SAS; access is via managed identity).</summary>
     Uri GetBlobUri(BlobReference reference);
 }

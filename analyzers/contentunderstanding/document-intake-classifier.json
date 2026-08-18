@@ -1,15 +1,18 @@
 {
-  "description": "Classifies inbound email attachments as a known intake form or as unknown content.",
+  "description": "Classifies inbound documents as Virginia DMAS Health Insurance Premium Payment (HIPP) application material or unrelated content.",
   "tags": {
     "project": "document-intake"
   },
-  "categories": {
-    "known-form": {
-      "description": "The single known intake form handled by this workflow. It contains a form header, an applicant/customer section, and a totals section."
+  "baseAnalyzerId": "prebuilt-document",
+  "config": {
+    "contentCategories": {
+      "hipp-application": {
+        "description": "A Virginia DMAS HIPP application or HIPP correspondence form. It contains HIPP branding or a hipp_application heading, an Application ID, a Correspondence Type, policyholder information, household information, employment or insurance information, and HIPP agreement fields."
+      },
+      "other": {
+        "description": "Any document that is not a HIPP application or HIPP correspondence form, including standalone paystubs, insurance cards, plan summaries, employer verification forms, correspondence, signature pages, or unrelated forms."
+      }
     },
-    "unknown": {
-      "description": "Any other document: correspondence, signatures pages, marketing material, scanned notes, or unrelated forms."
-    }
-  },
-  "splitMode": "none"
+    "enableSegment": false
+  }
 }

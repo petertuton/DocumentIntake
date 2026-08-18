@@ -19,3 +19,11 @@ public sealed record MoveBlobRequest(
 
 /// <summary>Result of moving a blob, carrying the destination URL.</summary>
 public sealed record MoveBlobResult(string DestinationContainer, string BlobName, string Url);
+
+/// <summary>Downloaded blob bytes together with the properties needed to serve them over HTTP.</summary>
+public sealed record BlobContent(
+    BinaryData Content,
+    string ContentType,
+    string FileName,
+    long Length,
+    string? ETag);

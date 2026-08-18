@@ -32,9 +32,13 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     // Shared keys stay enabled because the Functions host still needs them for the
     // Flex Consumption deployment container; all application access uses managed identity.
     allowSharedKeyAccess: true
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
     networkAcls: {
-      defaultAction: 'Allow'
+      defaultAction: 'Deny'
+      // Event Grid must call the storage control plane (listAccountSas) to configure the
+      // BlobCreated event subscription; this requires bypassing the firewall for trusted
+      // Microsoft services even though public network access stays disabled.
+      // See https://aka.ms/storageevents.
       bypass: 'AzureServices'
     }
   }

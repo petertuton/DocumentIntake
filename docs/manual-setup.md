@@ -2,6 +2,65 @@
 
 Two things cannot be automated by `azd up`. Do both after the first provision.
 
+## 0. Reaching private-endpoint-only storage with az cli
+
+The storage account has `publicNetworkAccess` disabled, so `az storage` commands used later in this
+guide only work from inside the VNet. Deploy an optional Azure Bastion + jump box VM to get there.
+
+If you don't already have an SSH key pair, generate one first (skip this if `~/.ssh/id_ed25519.pub`
+already exists):
+
+```powershell
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "jumpbox"
+```
+
+Leave the passphrase empty or set one; either works for `az network bastion ssh` since it prompts
+locally, not over the network.
+
+Azure Bastion needs a Standard SKU public IP, which some subscriptions (trial, CSP, sponsored)
+haven't been enabled for. Register the feature once, before the first `DEPLOY_JUMPBOX=true`
+provision (propagation can take a few minutes):
+
+```powershell
+az feature register --namespace Microsoft.Network --name AllowBringYourOwnPublicIpAddress
+az provider register --namespace Microsoft.Network
+```
+
+```powershell
+azd env set DEPLOY_JUMPBOX true
+azd env set JUMPBOX_ADMIN_SSH_PUBLIC_KEY (Get-Content ~/.ssh/id_ed25519.pub -Raw).Trim()
+azd provision
+```
+
+Connect over Bastion's native client (no open ports on the VM, no public IP). Echo the storage
+account name first so you can copy it before the `az storage` commands run inside the VM (`azd`
+isn't available there):
+
+```powershell
+$rg = azd env get-value AZURE_RESOURCE_GROUP
+$bastion = azd env get-value BASTION_NAME
+$vm = azd env get-value JUMPBOX_VM_NAME
+
+azd env get-value AZURE_STORAGE_ACCOUNT_NAME
+
+az network bastion ssh -n $bastion -g $rg `
+  --target-resource-id (az vm show -g $rg -n $vm --query id -o tsv) `
+  --auth-type ssh-key --username azureuser --ssh-key ~/.ssh/id_ed25519
+```
+
+From the jump box's shell, log in and run the `az storage` commands in this guide as normal —
+paste the account name echoed above into `acct`; the VM's managed identity already has
+`Storage Blob Data Contributor` on the account:
+
+```bash
+az login --identity
+acct=<paste the echoed account name here>
+az storage blob list --account-name $acct --container-name inbox --auth-mode login -o table
+```
+
+> Leave `DEPLOY_JUMPBOX` unset (or `false`) once you no longer need CLI access; re-run
+> `azd provision` to tear the Bastion host, public IP, NSG, and VM back down.
+
 ## 1. Authorize the Office 365 Outlook connection
 
 Bicep creates the API connection in an **unauthorized** state — OAuth consent is interactive by
@@ -21,11 +80,20 @@ $la = azd env get-value LOGIC_APP_NAME
 az logic workflow show -g $rg -n $la --query "{state:state, trigger:definition.triggers}" -o json
 ```
 
-Send a test email with an attachment to the mailbox and check that it lands:
+Send a test email with an attachment to the mailbox and check that it lands. `azd` only runs on
+your local machine, so resolve the storage account name there first:
 
 ```powershell
-az storage blob list --account-name (azd env get-value AZURE_STORAGE_ACCOUNT_NAME) `
-  --container-name inbox --auth-mode login -o table
+azd env get-value AZURE_STORAGE_ACCOUNT_NAME
+```
+
+> Run the `az storage` command below from the jump box (see [0. Reaching private-endpoint-only storage with az cli](#0-reaching-private-endpoint-only-storage-with-az-cli))
+> since the storage account only accepts traffic from its private endpoints — paste the account
+> name from above into `acct`.
+
+```bash
+acct=<paste the echoed account name here>
+az storage blob list --account-name $acct --container-name inbox --auth-mode login -o table
 ```
 
 > The mailbox account needs a licence that includes Exchange Online, and the connection must be
@@ -81,14 +149,21 @@ Only `Program.cs` and the handler change; `DataverseClient` itself is auth-agnos
 
 ## 3. Verify end to end
 
+Get the storage account name locally (`azd` isn't available on the jump box):
+
 ```powershell
-# 1. send an email with the known form attached
-# 2. watch it move through the containers
-$acct = azd env get-value AZURE_STORAGE_ACCOUNT_NAME
-foreach ($c in 'inbox','processing','completed','ignored','failed') {
-  $n = az storage blob list --account-name $acct --container-name $c --auth-mode login --query "length(@)" -o tsv
-  Write-Host "$c : $n"
-}
+azd env get-value AZURE_STORAGE_ACCOUNT_NAME
+```
+
+Then, from the jump box, send an email with the known form attached and watch it move through the
+containers (paste the account name from above into `acct`):
+
+```bash
+acct=<paste the echoed account name here>
+for c in inbox processing completed ignored failed; do
+  n=$(az storage blob list --account-name $acct --container-name $c --auth-mode login --query "length(@)" -o tsv)
+  echo "$c : $n"
+done
 ```
 
 A healthy run ends with the file in `completed` and, once Dataverse is enabled, a new record
@@ -97,7 +172,7 @@ whose `new_completedbloburl` matches that blob.
 Or use the scripted version, which uploads a file and waits for it to reach a terminal container:
 
 ```powershell
-./scripts/smoke-test.ps1 -File ./path/to/known-form.pdf
+./scripts/smoke-test.ps1 -File ./path/to/hipp-application.pdf
 ```
 
 ## Target Dataverse columns

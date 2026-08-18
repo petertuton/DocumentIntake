@@ -37,6 +37,9 @@ param dataverseEntitySetName string = ''
 @description('Enables the Dataverse step. Keep false until the application user exists.')
 param dataverseEnabled bool = false
 
+@description('Subnet used for outbound VNet integration to private storage endpoints.')
+param virtualNetworkSubnetId string
+
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
@@ -65,6 +68,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   }
   properties: {
     serverFarmId: plan.id
+    virtualNetworkSubnetId: virtualNetworkSubnetId
     httpsOnly: true
     functionAppConfig: {
       deployment: {
@@ -89,10 +93,6 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
       appSettings: [
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'dotnet-isolated'
-        }
         // Identity-based connection: no storage keys in configuration.
         {
           name: 'AzureWebJobsStorage__blobServiceUri'

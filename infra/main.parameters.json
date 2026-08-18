@@ -22,6 +22,15 @@
     },
     "dataverseEnabled": {
       "value": "${DATAVERSE_ENABLED=false}"
+    },
+    "deployJumpbox": {
+      "value": "${DEPLOY_JUMPBOX=false}"
+    },
+    "jumpboxAdminUsername": {
+      "value": "${JUMPBOX_ADMIN_USERNAME=azureuser}"
+    },
+    "jumpboxAdminSshPublicKey": {
+      "value": "${JUMPBOX_ADMIN_SSH_PUBLIC_KEY=}"
     }
   }
 }

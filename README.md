@@ -30,6 +30,8 @@ flowchart LR
 Every Azure-to-Azure hop uses a **system-assigned managed identity**: Function App → Storage,
 Function App → Foundry, Logic App → Storage, and Foundry → Storage (so the analyzer can read
 the blob URL it is handed). No connection strings or account keys appear in app settings.
+The Function App reaches Storage through VNet integration and private endpoints for Blob, Queue,
+Table, and File. Storage public network access is disabled.
 
 ## Containers
 
@@ -45,6 +47,67 @@ Moves are copy-then-delete (`StartCopyFromUri` → poll → delete), so a crash 
 lose a file. `BlobRouter.MoveAsync` treats "source gone, destination present" as success, which
 makes retries idempotent.
 
+## Serve a document to a UI
+
+Storage public network access is disabled, so a browser cannot fetch a processed document
+directly — not even with a SAS token. `GetDocumentTrigger` proxies the bytes through the Function
+App, which reaches Storage over its private endpoints.
+
+```text
+GET https://<function-app-name>.azurewebsites.net/api/documents/content?url=<blob url>
+x-functions-key: <function key>
+```
+
+Pass the `new_completedbloburl` value stored in Dataverse as `url`. A successful call returns the
+raw bytes with `Content-Disposition: inline`, so Power Pages can render the document in an
+`<iframe>` or `<embed>`.
+
+| Response | When |
+| -------- | ---- |
+| `200` | Blob found in an allowed container. |
+| `400` | Missing `url`, or a url that fails validation. |
+| `401` | Missing or wrong function key. |
+| `404` | Url is valid but the blob does not exist. |
+
+`BlobUrlValidator` rejects any url that is not HTTPS, does not match the configured storage
+account host and port, carries credentials, contains `.` or `..` path segments, or names a
+container outside `Containers.PublicViewable` (currently `completed` only). The query string is
+discarded, so a caller cannot smuggle in a SAS. Error responses never echo the submitted url.
+
+Only `application/pdf`, `image/png`, `image/jpeg`, `image/tiff`, and `text/plain` are served with
+their stored content type. Anything else is downgraded to `application/octet-stream` so a blob
+stored as `text/html` or `image/svg+xml` cannot execute as same-origin markup. Responses also set
+`X-Content-Type-Options: nosniff` and `Cache-Control: private, no-store`.
+
+> [!WARNING]
+> The function key must be attached server-side — from Power Pages Liquid or a plugin. Calling
+> this endpoint from browser JavaScript would publish the key to every visitor. The intended
+> production shape is Azure API Management in front of the endpoint, handling Entra ID.
+
+## Monitor durable workflows
+
+Durable Functions Monitor provides a read-only dashboard of orchestration instances, activity
+history, and failures. Open it at:
+
+```text
+https://<function-app-name>.azurewebsites.net/api/durable-functions-monitor
+```
+
+For operator access, enable [App Service Authentication](https://learn.microsoft.com/azure/app-service/overview-authentication-authorization)
+with Microsoft Entra ID before exposing the monitor.
+
+The monitor requires authentication by default. For a short-lived demo only, add the following
+Function App setting, then remove it when the demo ends:
+
+```text
+DFM_NONCE=i_sure_know_what_i_am_doing
+```
+
+> [!WARNING]
+> This setting disables Durable Functions Monitor authentication. Anyone who can reach the
+> Function App can view orchestration history while it is set. The monitor remains read-only, but
+> it can expose document names and processing details.
+
 ## Repo layout
 
 ```
@@ -52,7 +115,7 @@ infra/                    Bicep, azd-conventional
   main.bicep              subscription scope; creates rg-<env> and wires the modules
   core/                   storage, monitoring, foundry, functionapp, logicapp, eventgrid, rbac
 src/DocumentIntake.Functions
-  Triggers/               Event Grid entry point
+  Triggers/               Event Grid entry point + the document content endpoint
   Orchestrations/         the durable orchestrator + polling schedule
   Activities/             classify, move, submit, poll, map, post
   Services/               Content Understanding, blob routing, field mapping, Dataverse
@@ -92,7 +155,7 @@ Set as app settings by `infra/core/functionapp.bicep`; mirror them in `local.set
 | `ContentUnderstanding__ApiVersion` | Pinned API version (`2025-11-01`). |
 | `ContentUnderstanding__ClassifierId` | Classifier to call in step 1. |
 | `ContentUnderstanding__AnalyzerId` | Analyzer to call in step 3. |
-| `ContentUnderstanding__KnownFormCategory` | Category treated as a known form (default `known-form`). |
+| `ContentUnderstanding__KnownFormCategory` | Category treated as a HIPP application (default `hipp-application`). |
 | `ContentUnderstanding__MinimumClassificationConfidence` | Below this, the file goes to `ignored`. |
 | `ContentUnderstanding__MaxDocumentSizeBytes` | Larger files fail fast (default 200 MB). |
 | `Dataverse__EnvironmentUrl` | e.g. `https://contoso.crm.dynamics.com`. |
@@ -111,7 +174,7 @@ review tooling can highlight low-confidence fields and draw boxes on the source 
 
 ```json
 {
-  "new_formtype": "known-form",
+  "new_formtype": "hipp-application",
   "new_sourceblobname": "invoice.pdf",
   "new_completedbloburl": "https://acct.blob.core.windows.net/completed/invoice.pdf",
   "new_processedutc": "2024-05-06T07:08:09.0000000Z",

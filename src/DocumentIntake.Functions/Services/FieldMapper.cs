@@ -34,7 +34,7 @@ public sealed class FieldMapper : IFieldMapper
 
         var mapped = new List<FieldValue>(_columns.Count);
 
-        foreach (var field in fields.EnumerateObject())
+        foreach (var field in EnumerateLeafFields(fields))
         {
             if (!_columns.TryGetValue(field.Name, out var column))
             {
@@ -50,6 +50,30 @@ public sealed class FieldMapper : IFieldMapper
         }
 
         return mapped;
+    }
+
+    private static IEnumerable<(string Name, JsonElement Value)> EnumerateLeafFields(
+        JsonElement fields,
+        string prefix = "")
+    {
+        foreach (var field in fields.EnumerateObject())
+        {
+            var name = prefix.Length == 0 ? field.Name : $"{prefix}.{field.Name}";
+
+            if (field.Value.ValueKind == JsonValueKind.Object
+                && field.Value.TryGetProperty("valueObject", out var valueObject)
+                && valueObject.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var nested in EnumerateLeafFields(valueObject, name))
+                {
+                    yield return nested;
+                }
+
+                continue;
+            }
+
+            yield return (name, field.Value);
+        }
     }
 
     internal static bool TryFindFields(JsonElement element, out JsonElement fields)
