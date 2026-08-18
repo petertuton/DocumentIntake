@@ -4,6 +4,11 @@ Email attachments arrive in an M365 mailbox, get classified and OCR'd by Azure A
 Content Understanding, mapped onto a known form's columns, and pushed to Dataverse — with the
 file moving through blob containers that reflect its lifecycle state.
 
+> [!IMPORTANT]
+> This project is provided for demonstration and educational purposes only. It is not intended
+> for production use without additional review, hardening, security validation, operational
+> monitoring, compliance assessment, and testing.
+
 ## Architecture
 
 ```mermaid
