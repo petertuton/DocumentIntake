@@ -29,9 +29,8 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
     allowBlobPublicAccess: false
-    // Shared keys stay enabled because the Functions host still needs them for the
-    // Flex Consumption deployment container; all application access uses managed identity.
-    allowSharedKeyAccess: true
+    // Keep shared-key authentication disabled; Functions and deployment storage use identity-based access.
+    allowSharedKeyAccess: false
     publicNetworkAccess: 'Disabled'
     networkAcls: {
       defaultAction: 'Deny'

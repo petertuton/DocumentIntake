@@ -19,6 +19,9 @@ param appInsightsConnectionString string
 @description('Content Understanding (AI Services) endpoint.')
 param contentUnderstandingEndpoint string
 
+@description('Microsoft Foundry project endpoint for project-scoped model and platform APIs.')
+param foundryProjectEndpoint string
+
 @description('Content Understanding API version.')
 param contentUnderstandingApiVersion string
 
@@ -117,6 +120,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'ContentUnderstanding__Endpoint'
           value: contentUnderstandingEndpoint
+        }
+        {
+          name: 'Foundry__ProjectEndpoint'
+          value: foundryProjectEndpoint
         }
         {
           name: 'ContentUnderstanding__ApiVersion'

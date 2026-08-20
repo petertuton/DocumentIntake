@@ -2,6 +2,18 @@
 
 Two things cannot be automated by `azd up`. Do both after the first provision.
 
+The deployment creates a Microsoft Foundry project under the Azure AI Services account. Confirm
+the project endpoint after provisioning:
+
+```powershell
+azd env get-value AZURE_AI_PROJECT_NAME
+azd env get-value AZURE_AI_PROJECT_ENDPOINT
+```
+
+Use the project endpoint for project-scoped Foundry APIs. Keep the
+`CONTENT_UNDERSTANDING_ENDPOINT` account endpoint for analyzer registration because Content
+Understanding is a Foundry Tool endpoint.
+
 ## 0. Reaching private-endpoint-only storage with az cli
 
 The storage account has `publicNetworkAccess` disabled, so `az storage` commands used later in this
@@ -106,10 +118,38 @@ This decision was deliberately deferred; `IDataverseClient` isolates it. `Datave
 defaults to `false`, which logs the payload instead of posting, so the rest of the pipeline is
 fully exercisable before you choose.
 
-### Option A — managed identity (preferred)
+### Option A: app registration with a client secret (cross-tenant)
 
-Dataverse can accept the Function App's system-assigned identity as an application user. This
-keeps the "no secrets" property of the rest of the solution.
+Use this mode while the Function App and Dataverse environment are in different Microsoft Entra
+tenants. The app registration and the Dataverse application user must belong to the tenant that
+owns the Dataverse environment.
+
+1. Ask the Dataverse administrator to create an application registration and Dataverse application
+   user, then assign a least-privilege role with **Create** access to the target table.
+2. Obtain the Dataverse tenant ID, application (client) ID, and a client secret. Store the secret in
+   Key Vault and configure the Function App setting as a Key Vault reference.
+3. Set the app settings:
+
+   ```powershell
+   az functionapp config appsettings set `
+     -g (azd env get-value AZURE_RESOURCE_GROUP) `
+     -n (azd env get-value AZURE_FUNCTION_APP_NAME) `
+     --settings Dataverse__Enabled=true `
+                Dataverse__EnvironmentUrl=https://<org>.crm.dynamics.com `
+                Dataverse__EntitySetName=new_documentintakes `
+                Dataverse__AuthMode=ClientSecret `
+                Dataverse__ClientSecretTenantId=<dataverse-tenant-id> `
+                Dataverse__ClientSecretClientId=<application-client-id> `
+                Dataverse__ClientSecretValue='@Microsoft.KeyVault(SecretUri=https://<vault>.vault.azure.net/secrets/<secret-name>)'
+   ```
+
+Do not add the secret to `local.settings.json` or commit it. When running locally, set
+`Dataverse__ClientSecretValue` through user secrets or an untracked `local.settings.json` file.
+
+### Option B: managed identity (same tenant)
+
+Use this mode when the Function App and Dataverse environment belong to the same Microsoft Entra
+tenant. It keeps the "no secrets" property of the rest of the solution.
 
 1. Get the Function App's principal id:
 
@@ -132,20 +172,38 @@ keeps the "no secrets" property of the rest of the solution.
      -n (azd env get-value AZURE_FUNCTION_APP_NAME) `
      --settings Dataverse__Enabled=true `
                 Dataverse__EnvironmentUrl=https://<org>.crm.dynamics.com `
-                Dataverse__EntitySetName=new_documentintakes
+                Dataverse__EntitySetName=new_documentintakes `
+                Dataverse__AuthMode=ManagedIdentity
    ```
 
-`ManagedIdentityAuthHandler` already requests the `{EnvironmentUrl}/.default` scope, so no code
-change is required for this option.
+`DataverseClient` already requests the `{EnvironmentUrl}/.default` scope for whichever
+environment the document's classification resolves to, so no code change is required for this
+option.
 
-### Option B — app registration with a client secret
+### Routing a classification to a different environment or entity set
 
-If managed identity is not viable, register an app, create a secret, add it as an application
-user in Dataverse the same way, and replace `ManagedIdentityAuthHandler` on the `dataverse`
-HttpClient in `Program.cs` with a client-credentials handler. Store the secret in Key Vault and
-reference it from app settings — do not put it in `local.settings.json` or commit it.
+`Dataverse__EnvironmentUrl`, `Dataverse__EntitySetName`, and (for Option A) the three
+`Dataverse__ClientSecret*` settings are the defaults used when a document's classification has no
+specific mapping. To send a classification to its own environment, entity set, or app
+registration, add an indexed `Dataverse__FormMappings__<index>__*` entry per field you want to
+override; anything left unset falls back to the default. `FormMappings` is a list, not a
+dictionary keyed by classification, because Azure App Service settings become environment
+variables and classification names such as `hipp-application` contain a hyphen, which isn't a
+valid environment variable name character. For example, to route `hipp-application` documents to
+the `cr417_annotatedpdf` entity set:
 
-Only `Program.cs` and the handler change; `DataverseClient` itself is auth-agnostic.
+```powershell
+az functionapp config appsettings set `
+  -g (azd env get-value AZURE_RESOURCE_GROUP) `
+  -n (azd env get-value AZURE_FUNCTION_APP_NAME) `
+  --settings Dataverse__FormMappings__0__Classification=hipp-application `
+             Dataverse__FormMappings__0__EntitySetName=cr417_annotatedpdf
+```
+
+If `Dataverse__AuthMode` is `ClientSecret`, a mapping's `ClientSecretTenantId`, `ClientSecretClientId`,
+and `ClientSecretValue` must be set together (or all left blank to use the defaults) — startup
+validation rejects a partial override, since mixing a tenant or client from one app registration
+with a secret from another would silently authenticate as the wrong identity.
 
 ## 3. Verify end to end
 
@@ -177,16 +235,15 @@ Or use the scripted version, which uploads a file and waits for it to reach a te
 
 ## Target Dataverse columns
 
-The table must expose the envelope columns plus one column per mapped field:
+For this PoC, the table must expose three columns for each mapped field in
+`analyzers/contentunderstanding/field-map.json`:
 
 | Column | Type | Notes |
 | ------ | ---- | ----- |
-| `new_formtype` | Text | Classifier category. |
-| `new_sourceblobname` | Text | Original blob name. |
-| `new_completedbloburl` | Text | URL in the `completed` container. |
-| `new_processedutc` | Text or DateTime | ISO 8601, UTC. |
-| `new_classificationconfidence` | Decimal | 0–1. |
-| `new_extractionjson` | Multiline text | Full extraction: value, confidence, bounding box per field. |
-| one per entry in `field-map.json` | Text | Scalar value of each extracted field. |
+| `<field>` | Text | Scalar extracted value, for example `cr417_field1`. |
+| `<field>confidence` | Decimal | Confidence from Content Understanding, from 0 to 1. |
+| `<field>source` | Text | Bounding box in `D(page,x1,y1,...)` format, or null when unavailable. |
 
-Make `new_extractionjson` generously sized — it holds coordinates for every field.
+The current mappings are `cr417_field1`, `cr417_field2`, and `cr417_field3`, so the related
+confidence and source columns are named `cr417_field1confidence`, `cr417_field1source`, and so
+on.

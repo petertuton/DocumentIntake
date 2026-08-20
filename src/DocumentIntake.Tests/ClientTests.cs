@@ -56,39 +56,33 @@ public sealed class DataverseClientTests
     };
 
     [Fact]
-    public void BuildRecord_IncludesEnvelopeColumns()
+    public void BuildRecord_ContainsOnlyMappedFieldTriplets()
     {
         var record = DataverseClient.BuildRecord(CreateForm());
 
-        Assert.Equal("known-form", record["new_formtype"]);
-        Assert.Equal("invoice.pdf", record["new_sourceblobname"]);
-        Assert.Equal("https://acct.blob.core.windows.net/completed/invoice.pdf", record["new_completedbloburl"]);
-        Assert.Equal(0.91, record["new_classificationconfidence"]);
-        Assert.Equal("2024-05-06T07:08:09.0000000Z", record["new_processedutc"]);
+        Assert.Equal(7, record.Count);
+        Assert.DoesNotContain("new_formtype", record.Keys);
+        Assert.DoesNotContain("new_extractionjson", record.Keys);
     }
 
     [Fact]
-    public void BuildRecord_FlattensEachFieldOntoItsColumn()
+    public void BuildRecord_EmitsValueConfidenceAndSourceForEachField()
     {
         var record = DataverseClient.BuildRecord(CreateForm());
 
         Assert.Equal("CLM-1", record["new_claimnumber"]);
+        Assert.Equal(0.95, record["new_claimnumberconfidence"]);
+        Assert.Equal("D(1,0,0,1,0,1,1,0,1)", record["new_claimnumbersource"]);
+
         Assert.Equal("100.5", record["new_totalamount"]);
+        Assert.Equal(0.7, record["new_totalamountconfidence"]);
+        Assert.Null(record["new_totalamountsource"]);
     }
 
     [Fact]
-    public void BuildRecord_RetainsFullExtractionWithCoordinatesAndConfidence()
+    public void FormatSource_ReturnsNullWithoutBoundingBox()
     {
-        var record = DataverseClient.BuildRecord(CreateForm());
-
-        var json = Assert.IsType<string>(record["new_extractionjson"]);
-        using var document = JsonDocument.Parse(json);
-
-        var first = document.RootElement[0];
-        Assert.Equal("new_claimnumber", first.GetProperty("column").GetString());
-        Assert.Equal(0.95, first.GetProperty("confidence").GetDouble(), 3);
-        Assert.Equal(1, first.GetProperty("boundingBox").GetProperty("page").GetInt32());
-        Assert.Equal(8, first.GetProperty("boundingBox").GetProperty("polygon").GetArrayLength());
+        Assert.Null(DataverseClient.FormatSource(null));
     }
 
     [Fact]

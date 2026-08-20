@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.44.1.10279",
-      "templateHash": "6836842841948665589"
+      "templateHash": "13881696130380605332"
     }
   },
   "parameters": {
@@ -910,6 +910,9 @@
           "name": {
             "value": "[format('ais-{0}', variables('resourceToken'))]"
           },
+          "projectName": {
+            "value": "[format('document-intake-{0}', variables('resourceToken'))]"
+          },
           "location": {
             "value": "[parameters('foundryLocation')]"
           },
@@ -924,14 +927,20 @@
             "_generator": {
               "name": "bicep",
               "version": "0.44.1.10279",
-              "templateHash": "2468211244665817294"
+              "templateHash": "1483117991068548520"
             }
           },
           "parameters": {
             "name": {
               "type": "string",
               "metadata": {
-                "description": "Name of the Azure AI Services (Foundry) account used for Content Understanding."
+                "description": "Name of the Azure AI Services (Foundry) account."
+              }
+            },
+            "projectName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Microsoft Foundry project under the account."
               }
             },
             "location": {
@@ -951,7 +960,7 @@
           "resources": [
             {
               "type": "Microsoft.CognitiveServices/accounts",
-              "apiVersion": "2024-10-01",
+              "apiVersion": "2025-06-01",
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
@@ -963,6 +972,7 @@
                 "type": "SystemAssigned"
               },
               "properties": {
+                "allowProjectManagement": true,
                 "customSubDomainName": "[parameters('name')]",
                 "publicNetworkAccess": "Enabled",
                 "disableLocalAuth": true,
@@ -972,8 +982,25 @@
               }
             },
             {
+              "type": "Microsoft.CognitiveServices/accounts/projects",
+              "apiVersion": "2025-06-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('projectName'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "description": "Microsoft Foundry project for Document Intake.",
+                "displayName": "Document Intake"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts', parameters('name'))]"
+              ]
+            },
+            {
               "type": "Microsoft.CognitiveServices/accounts/deployments",
-              "apiVersion": "2024-10-01",
+              "apiVersion": "2025-06-01",
               "name": "[format('{0}/{1}', parameters('name'), 'gpt-5-mini')]",
               "sku": {
                 "name": "GlobalStandard",
@@ -992,7 +1019,7 @@
             },
             {
               "type": "Microsoft.CognitiveServices/accounts/deployments",
-              "apiVersion": "2024-10-01",
+              "apiVersion": "2025-06-01",
               "name": "[format('{0}/{1}', parameters('name'), 'text-embedding-3-large')]",
               "sku": {
                 "name": "GlobalStandard",
@@ -1022,7 +1049,23 @@
             },
             "endpoint": {
               "type": "string",
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2024-10-01').endpoint]"
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2025-06-01').endpoint]"
+            },
+            "projectId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('name'), parameters('projectName'))]"
+            },
+            "projectName": {
+              "type": "string",
+              "value": "[parameters('projectName')]"
+            },
+            "projectPrincipalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('name'), parameters('projectName')), '2025-06-01', 'full').identity.principalId]"
+            },
+            "projectEndpoint": {
+              "type": "string",
+              "value": "[format('https://{0}.services.ai.azure.com/api/projects/{1}', parameters('name'), parameters('projectName'))]"
             },
             "completionDeploymentName": {
               "type": "string",
@@ -1071,6 +1114,9 @@
           "contentUnderstandingEndpoint": {
             "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.endpoint.value]"
           },
+          "foundryProjectEndpoint": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.projectEndpoint.value]"
+          },
           "contentUnderstandingApiVersion": {
             "value": "[parameters('contentUnderstandingApiVersion')]"
           },
@@ -1100,7 +1146,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.44.1.10279",
-              "templateHash": "3588496538688696321"
+              "templateHash": "8869943064591552393"
             }
           },
           "parameters": {
@@ -1145,6 +1191,12 @@
               "type": "string",
               "metadata": {
                 "description": "Content Understanding (AI Services) endpoint."
+              }
+            },
+            "foundryProjectEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Microsoft Foundry project endpoint for project-scoped model and platform APIs."
               }
             },
             "contentUnderstandingApiVersion": {
@@ -1269,6 +1321,10 @@
                     {
                       "name": "ContentUnderstanding__Endpoint",
                       "value": "[parameters('contentUnderstandingEndpoint')]"
+                    },
+                    {
+                      "name": "Foundry__ProjectEndpoint",
+                      "value": "[parameters('foundryProjectEndpoint')]"
                     },
                     {
                       "name": "ContentUnderstanding__ApiVersion",
@@ -1563,6 +1619,9 @@
           "foundryAccountName": {
             "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.name.value]"
           },
+          "foundryProjectPrincipalId": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.projectPrincipalId.value]"
+          },
           "functionAppPrincipalId": {
             "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'functionapp'), '2025-04-01').outputs.principalId.value]"
           },
@@ -1578,7 +1637,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.44.1.10279",
-              "templateHash": "7765145604139720323"
+              "templateHash": "6450567926726059938"
             }
           },
           "parameters": {
@@ -1592,6 +1651,12 @@
               "type": "string",
               "metadata": {
                 "description": "Azure AI Services (Foundry) account name."
+              }
+            },
+            "foundryProjectPrincipalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal id of the Microsoft Foundry project managed identity."
               }
             },
             "functionAppPrincipalId": {
@@ -1673,7 +1738,18 @@
               "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName')), variables('storageBlobDataReader'))]",
               "properties": {
                 "roleDefinitionId": "[variables('storageBlobDataReader')]",
-                "principalId": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName')), '2024-10-01', 'full').identity.principalId]",
+                "principalId": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('foundryAccountName')), '2025-06-01', 'full').identity.principalId]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), parameters('foundryProjectPrincipalId'), variables('storageBlobDataReader'))]",
+              "properties": {
+                "roleDefinitionId": "[variables('storageBlobDataReader')]",
+                "principalId": "[parameters('foundryProjectPrincipalId')]",
                 "principalType": "ServicePrincipal"
               }
             },
@@ -1823,6 +1899,18 @@
     "AZURE_FOUNDRY_ACCOUNT_NAME": {
       "type": "string",
       "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.name.value]"
+    },
+    "AZURE_AI_PROJECT_ID": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.projectId.value]"
+    },
+    "AZURE_AI_PROJECT_NAME": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.projectName.value]"
+    },
+    "AZURE_AI_PROJECT_ENDPOINT": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, format('rg-{0}', parameters('environmentName'))), 'Microsoft.Resources/deployments', 'foundry'), '2025-04-01').outputs.projectEndpoint.value]"
     },
     "CONTENT_UNDERSTANDING_ENDPOINT": {
       "type": "string",

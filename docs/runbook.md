@@ -50,8 +50,8 @@ Durable history also lives in the storage account's `DocumentIntakeHub` tables
 | ------- | ------------ | ------ |
 | Nothing lands in `inbox` | O365 connection not authorized | Authorize it — see [manual-setup.md](manual-setup.md). |
 | Blobs land but no orchestration starts | Event Grid subscription unhealthy | Check the system topic's delivery failures in the portal; confirm the Function App is running. |
-| `403` from Content Understanding | Function MI missing **Cognitive Services User** | Re-run `azd provision`; RBAC lives in `infra/core/rbac.bicep`. |
-| Content Understanding cannot read the blob | Foundry MI missing **Storage Blob Data Contributor**, or the URL is not publicly resolvable | Re-run `azd provision`. Foundry reaches storage over the public endpoint. |
+| `403` from Content Understanding | Function MI missing **Cognitive Services User** on the Foundry account | Re-run `azd provision`; RBAC lives in `infra/core/rbac.bicep`. |
+| Content Understanding cannot read the blob | Foundry account or project MI missing **Storage Blob Data Reader**, or the URL is not publicly resolvable | Re-run `azd provision`. Foundry reaches storage over the public endpoint. |
 | Everything goes to `ignored` | Classifier not registered, or confidence threshold too high | Run `scripts/register-analyzers.ps1`; check `ContentUnderstanding__MinimumClassificationConfidence`. |
 | `Analysis timed out` in `intakeReason` | Document exceeded the 10-minute poll window | Confirm the analyzer completes for that document; raise `DocumentIntakeOrchestrator.PollTimeout` if genuinely needed. |
 | `DocumentTooLargeException` | Attachment above the configured size guard | Handle the document out of band. |

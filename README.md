@@ -139,8 +139,10 @@ azd auth login
 azd up
 ```
 
-`azd up` provisions everything and then runs `scripts/register-analyzers.ps1` as a postprovision
-hook to register the classifier and analyzer against the new Foundry endpoint.
+`azd up` provisions the Azure AI Services account, a Microsoft Foundry project beneath that
+account, and the model deployments. It then runs `scripts/register-analyzers.ps1` as a
+postprovision hook to register the classifier and analyzer against the Content Understanding
+tool endpoint. The project endpoint is exposed separately for project-scoped Foundry APIs.
 
 Two steps still need a human — see [docs/manual-setup.md](docs/manual-setup.md):
 
@@ -156,15 +158,17 @@ Set as app settings by `infra/core/functionapp.bicep`; mirror them in `local.set
 | ------- | ------- |
 | `Storage__BlobServiceUri` | Blob endpoint used by `BlobRouter`. |
 | `AzureWebJobsStorage__blobServiceUri` / `__queueServiceUri` / `__tableServiceUri` | Identity-based host storage (Durable Functions needs all three). |
-| `ContentUnderstanding__Endpoint` | Foundry account endpoint. |
+| `ContentUnderstanding__Endpoint` | Azure AI Services endpoint used by Content Understanding (`https://<resource>.cognitiveservices.azure.com`). |
+| `Foundry__ProjectEndpoint` | Microsoft Foundry project endpoint (`https://<resource>.services.ai.azure.com/api/projects/<project>`). |
 | `ContentUnderstanding__ApiVersion` | Pinned API version (`2025-11-01`). |
 | `ContentUnderstanding__ClassifierId` | Classifier to call in step 1. |
 | `ContentUnderstanding__AnalyzerId` | Analyzer to call in step 3. |
 | `ContentUnderstanding__KnownFormCategory` | Category treated as a HIPP application (default `hipp-application`). |
 | `ContentUnderstanding__MinimumClassificationConfidence` | Below this, the file goes to `ignored`. |
 | `ContentUnderstanding__MaxDocumentSizeBytes` | Larger files fail fast (default 200 MB). |
-| `Dataverse__EnvironmentUrl` | e.g. `https://contoso.crm.dynamics.com`. |
-| `Dataverse__EntitySetName` | Target entity set for the create. |
+| `Dataverse__EnvironmentUrl` | e.g. `https://contoso.crm.dynamics.com`. Default used when a classification has no mapping. |
+| `Dataverse__EntitySetName` | Target entity set for the create. Default used when a classification has no mapping. |
+| `Dataverse__FormMappings__<index>__Classification` / `__EnvironmentUrl` / `__EntitySetName` / `__ClientSecretTenantId` / `__ClientSecretClientId` / `__ClientSecretValue` | Per-classification overrides (a 0-based indexed list, since classification names like `hipp-application` aren't valid dictionary-key environment variable segments). Unset fields fall back to the defaults above. |
 | `Dataverse__Enabled` | `false` logs the payload instead of posting — the default until auth is chosen. |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Telemetry. |
 
@@ -174,20 +178,19 @@ come from settings that might change between replays.
 
 ## Output shape
 
-The JSON posted to Dataverse carries the flattened columns plus a full extraction record so
-review tooling can highlight low-confidence fields and draw boxes on the source document:
+For this PoC, the JSON posted to Dataverse contains three properties for each mapped field:
+the extracted value, its confidence, and its source bounding box:
 
 ```json
 {
-  "new_formtype": "hipp-application",
-  "new_sourceblobname": "invoice.pdf",
-  "new_completedbloburl": "https://acct.blob.core.windows.net/completed/invoice.pdf",
-  "new_processedutc": "2024-05-06T07:08:09.0000000Z",
-  "new_classificationconfidence": 0.91,
-  "new_claimnumber": "CLM-4471",
-  "new_extractionjson": "[{\"column\":\"new_claimnumber\",\"value\":\"CLM-4471\",\"confidence\":0.94,\"boundingBox\":{\"page\":1,\"polygon\":[0.5,1.0,2.5,1.0,2.5,1.4,0.5,1.4]}}]"
+  "cr417_field1": "Jordan",
+  "cr417_field1confidence": 0.969,
+  "cr417_field1source": "D(1,4.7130,4.3180,6.0458,4.3283,6.0445,4.4866,4.7118,4.4762)"
 }
 ```
+
+The same naming convention applies to `cr417_field2` and `cr417_field3`. A field without a
+bounding box has a `null` source value.
 
 ## Develop
 
@@ -197,8 +200,8 @@ dotnet test  DocumentIntake.slnx
 az bicep build --file infra/main.bicep --stdout > $null
 ```
 
-To run the Functions host locally you need Azurite (or a real storage account) and a reachable
-Foundry endpoint:
+To run the Functions host locally you need Azurite (or a real storage account), a reachable
+Content Understanding endpoint, and a configured Foundry project endpoint:
 
 ```powershell
 azurite --silent &

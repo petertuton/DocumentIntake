@@ -110,6 +110,7 @@ module foundry 'core/foundry.bicep' = {
   scope: rg
   params: {
     name: 'ais-${resourceToken}'
+    projectName: 'document-intake-${resourceToken}'
     location: foundryLocation
     tags: tags
   }
@@ -126,6 +127,7 @@ module functionApp 'core/functionapp.bicep' = {
     deploymentContainerName: storage.outputs.deploymentContainerName
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     contentUnderstandingEndpoint: foundry.outputs.endpoint
+    foundryProjectEndpoint: foundry.outputs.projectEndpoint
     contentUnderstandingApiVersion: contentUnderstandingApiVersion
     classifierId: classifierId
     analyzerId: analyzerId
@@ -154,6 +156,7 @@ module rbac 'core/rbac.bicep' = {
   params: {
     storageAccountName: storage.outputs.name
     foundryAccountName: foundry.outputs.name
+    foundryProjectPrincipalId: foundry.outputs.projectPrincipalId
     functionAppPrincipalId: functionApp.outputs.principalId
     logicAppPrincipalId: logicApp.outputs.principalId
     jumpboxPrincipalId: deployJumpbox ? jumpbox.outputs.jumpboxPrincipalId : ''
@@ -179,6 +182,9 @@ output AZURE_STORAGE_ACCOUNT_NAME string = storage.outputs.name
 output AZURE_STORAGE_BLOB_ENDPOINT string = storage.outputs.blobEndpoint
 output AZURE_FUNCTION_APP_NAME string = functionApp.outputs.name
 output AZURE_FOUNDRY_ACCOUNT_NAME string = foundry.outputs.name
+output AZURE_AI_PROJECT_ID string = foundry.outputs.projectId
+output AZURE_AI_PROJECT_NAME string = foundry.outputs.projectName
+output AZURE_AI_PROJECT_ENDPOINT string = foundry.outputs.projectEndpoint
 output CONTENT_UNDERSTANDING_ENDPOINT string = foundry.outputs.endpoint
 output CONTENT_UNDERSTANDING_API_VERSION string = contentUnderstandingApiVersion
 output CONTENT_UNDERSTANDING_CLASSIFIER_ID string = classifierId

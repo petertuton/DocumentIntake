@@ -36,9 +36,11 @@ var host = new HostBuilder()
         services.AddOptions<DataverseOptions>()
             .Bind(context.Configuration.GetSection(DataverseOptions.SectionName))
             .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<DataverseOptions>, DataverseOptionsValidator>();
 
         // One credential instance, reused by every Azure client and token handler.
         services.AddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
+        services.AddSingleton<DataverseTokenCredentialFactory>();
 
         services.AddSingleton(sp =>
         {
@@ -61,18 +63,7 @@ var host = new HostBuilder()
                 "https://cognitiveservices.azure.com/.default"));
 
         services
-            .AddHttpClient<IDataverseClient, DataverseClient>(DataverseClient.HttpClientName)
-            .AddHttpMessageHandler(sp =>
-            {
-                // Scope is the Dataverse environment url; the identity must exist as an
-                // application user in Dataverse. Swap this handler if an app registration is chosen.
-                var options = sp.GetRequiredService<IOptions<DataverseOptions>>().Value;
-                var scope = string.IsNullOrWhiteSpace(options.EnvironmentUrl)
-                    ? "https://service.powerapps.com/.default"
-                    : $"{options.EnvironmentUrl.TrimEnd('/')}/.default";
-
-                return new ManagedIdentityAuthHandler(sp.GetRequiredService<TokenCredential>(), scope);
-            });
+            .AddHttpClient<IDataverseClient, DataverseClient>(DataverseClient.HttpClientName);
 
         services.AddSingleton<IFieldMapper>(sp =>
         {

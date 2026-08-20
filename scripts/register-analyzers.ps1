@@ -6,7 +6,9 @@
 .DESCRIPTION
     Run after `azd provision`. Reads the endpoint and ids from azd environment values
     (or from the parameters below) and PUTs each definition to the Content Understanding
-    control plane using the signed-in Azure CLI identity.
+    control plane using the signed-in Azure CLI identity. Content Understanding is a
+    Foundry Tool and therefore uses the Azure AI Services account endpoint; project-scoped
+    Foundry APIs use the separate AZURE_AI_PROJECT_ENDPOINT output.
 #>
 [CmdletBinding()]
 param(

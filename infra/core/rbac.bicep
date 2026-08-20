@@ -4,6 +4,9 @@ param storageAccountName string
 @description('Azure AI Services (Foundry) account name.')
 param foundryAccountName string
 
+@description('Principal id of the Microsoft Foundry project managed identity.')
+param foundryProjectPrincipalId string
+
 @description('Principal id of the Function App managed identity.')
 param functionAppPrincipalId string
 
@@ -38,7 +41,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
 
-resource foundry 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+resource foundry 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: foundryAccountName
 }
 
@@ -91,6 +94,16 @@ resource foundryBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     roleDefinitionId: storageBlobDataReader
     principalId: foundry.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource foundryProjectBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storage
+  name: guid(storage.id, foundryProjectPrincipalId, storageBlobDataReader)
+  properties: {
+    roleDefinitionId: storageBlobDataReader
+    principalId: foundryProjectPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
