@@ -22,6 +22,12 @@ __azurite_db*__.json
 __blobstorage__/
 __queuestorage__/
 
+# Viewer (node/vite)
+node_modules/
+dist/
+.env.local
+*.tsbuildinfo
+
 # Test results
 TestResults/
 coverage*.xml

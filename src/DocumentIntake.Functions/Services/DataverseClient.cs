@@ -93,6 +93,47 @@ public sealed class DataverseClient : IDataverseClient
         return recordId;
     }
 
+    public async Task<string?> GetRecordAsync(Guid recordId, CancellationToken cancellationToken = default)
+    {
+        if (!_options.Enabled)
+        {
+            throw new InvalidOperationException("Dataverse integration is disabled.");
+        }
+
+        var target = _options.Resolve(null);
+
+        var requestUri = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{target.EnvironmentUrl.TrimEnd('/')}/api/data/{_options.ApiVersion}/{target.EntitySetName}({recordId:D})");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+        request.Headers.Add("OData-MaxVersion", "4.0");
+        request.Headers.Add("OData-Version", "4.0");
+
+        var credential = _credentialFactory.Create(_options, target);
+        var scope = $"{target.EnvironmentUrl.TrimEnd('/')}/.default";
+        var token = await credential
+            .GetTokenAsync(new TokenRequestContext([scope]), cancellationToken)
+            .ConfigureAwait(false);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
+
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException(
+                $"Dataverse read failed with HTTP {(int)response.StatusCode}: {body}");
+        }
+
+        return body;
+    }
+
     internal static Dictionary<string, object?> BuildRecord(MappedForm form)
     {
         var record = new Dictionary<string, object?>(StringComparer.Ordinal)

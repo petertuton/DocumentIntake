@@ -1,0 +1,37 @@
+{
+  "formType": "hipp-application",
+  "sourceBlobName": "sample-hipp-application.pdf",
+  "completedBlobUrl": null,
+  "processedUtc": "2026-08-24T09:15:00+00:00",
+  "classificationConfidence": 0.93,
+  "fields": [
+    {
+      "column": "cr417_field1",
+      "value": "Smith",
+      "confidence": 0.96,
+      "boundingBox": { "page": 1, "polygon": [1.05, 2.31, 3.42, 2.31, 3.42, 2.55, 1.05, 2.55] },
+      "type": "string"
+    },
+    {
+      "column": "cr417_field2",
+      "value": "1978-04-12",
+      "confidence": 0.88,
+      "boundingBox": { "page": 1, "polygon": [4.15, 2.31, 5.6, 2.31, 5.6, 2.55, 4.15, 2.55] },
+      "type": "date"
+    },
+    {
+      "column": "cr417_field3",
+      "value": "true",
+      "confidence": 0.64,
+      "boundingBox": { "page": 1, "polygon": [1.05, 3.4, 1.35, 3.4, 1.35, 3.66, 1.05, 3.66] },
+      "type": "boolean"
+    },
+    {
+      "column": "cr417_field4",
+      "value": "884213",
+      "confidence": 0.91,
+      "boundingBox": { "page": 2, "polygon": [1.05, 1.2, 2.6, 1.2, 2.6, 1.46, 1.05, 1.46] },
+      "type": "integer"
+    }
+  ]
+}
