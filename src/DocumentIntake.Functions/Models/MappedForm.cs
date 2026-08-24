@@ -12,7 +12,8 @@ public sealed record FieldValue(
     [property: JsonPropertyName("column")] string Column,
     [property: JsonPropertyName("value")] string? Value,
     [property: JsonPropertyName("confidence")] double Confidence,
-    [property: JsonPropertyName("boundingBox")] BoundingBox? BoundingBox);
+    [property: JsonPropertyName("boundingBox")] BoundingBox? BoundingBox,
+    [property: JsonPropertyName("type")] string Type = "string");
 
 /// <summary>The payload posted to Dataverse for one processed document.</summary>
 public sealed record MappedForm

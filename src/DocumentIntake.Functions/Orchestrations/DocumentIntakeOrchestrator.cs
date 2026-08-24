@@ -99,18 +99,25 @@ public static class DocumentIntakeOrchestrator
                     classification.Confidence),
                 RetryOptions);
 
-            // 6. Archive, capturing the final URL in the payload.
-            var completed = await context.CallActivityAsync<MoveBlobResult>(
-                MoveBlobActivity.Name,
-                new MoveBlobRequest(Containers.Processing, Containers.Completed, request.BlobName),
+            // 6. Resolve the archive URL up front so the payload is complete before the move.
+            var completedUrl = await context.CallActivityAsync<string>(
+                ResolveBlobUrlActivity.Name,
+                new BlobReference(Containers.Completed, request.BlobName),
                 RetryOptions);
 
-            var finalForm = mapped with { CompletedBlobUrl = completed.Url };
+            var finalForm = mapped with { CompletedBlobUrl = completedUrl };
 
-            // 7. Hand off to Dataverse.
+            // 7. Hand off to Dataverse. A failure here leaves the blob in processing so
+            // the catch below can route it to the failed container.
             var recordId = await context.CallActivityAsync<string?>(
                 PostToDataverseActivity.Name,
                 finalForm,
+                RetryOptions);
+
+            // 8. Archive only once the record exists.
+            var completed = await context.CallActivityAsync<MoveBlobResult>(
+                MoveBlobActivity.Name,
+                new MoveBlobRequest(Containers.Processing, Containers.Completed, request.BlobName),
                 RetryOptions);
 
             logger.LogInformation("Completed {BlobName} as record {RecordId}.", request.BlobName, recordId);
@@ -190,8 +197,8 @@ public static class DocumentIntakeOrchestrator
         string reason,
         ILogger logger)
     {
-        // The blob may be in the inbox or already in processing depending on where we failed.
-        foreach (var source in new[] { Containers.Processing, Containers.Inbox })
+        // The blob may be in the inbox, in processing, or already archived depending on where we failed.
+        foreach (var source in new[] { Containers.Processing, Containers.Inbox, Containers.Completed })
         {
             try
             {

@@ -25,7 +25,7 @@
         "description": "The selected HIPP correspondence type: New HIPP application, Quarterly Paystub Submission, Annual HIPP Renewal, or Information change."
       },
       "HippNumber": {
-        "type": "string",
+        "type": "integer",
         "method": "extract",
         "description": "The five-digit HIPP number, when present."
       },

@@ -22,6 +22,8 @@ public sealed class DataverseClient : IDataverseClient
 {
     public const string HttpClientName = "dataverse";
 
+    private const int MaxSourceFieldLength = 100;
+
     private readonly HttpClient _http;
     private readonly DataverseOptions _options;
     private readonly DataverseTokenCredentialFactory _credentialFactory;
@@ -106,12 +108,39 @@ public sealed class DataverseClient : IDataverseClient
 
         foreach (var field in form.Fields)
         {
-            record[field.Column] = field.Value;
+            record[field.Column] = ConvertValue(field);
             record[$"{field.Column}confidence"] = field.Confidence;
             record[$"{field.Column}source"] = FormatSource(field.BoundingBox);
         }
 
         return record;
+    }
+
+    private static object? ConvertValue(FieldValue field)
+    {
+        if (field.Value is null)
+        {
+            return null;
+        }
+
+        return field.Type.ToLowerInvariant() switch
+        {
+            "boolean" => bool.Parse(field.Value),
+            "integer" => long.Parse(field.Value, NumberStyles.Integer, CultureInfo.InvariantCulture),
+            "number" => decimal.Parse(field.Value, NumberStyles.Float, CultureInfo.InvariantCulture),
+            "date" => ParseDateTime(field.Value),
+            _ => field.Value,
+        };
+    }
+
+    private static DateTimeOffset ParseDateTime(string value)
+    {
+        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var dateTime))
+        {
+            return dateTime;
+        }
+
+        throw new FormatException($"The extracted date '{value}' is not a valid date.");
     }
 
     internal static string? FormatSource(BoundingBox? boundingBox)
@@ -121,9 +150,30 @@ public sealed class DataverseClient : IDataverseClient
             return null;
         }
 
+        var source = FormatSource(boundingBox, "G17");
+        if (source.Length <= MaxSourceFieldLength)
+        {
+            return source;
+        }
+
+        for (var decimalPlaces = 6; decimalPlaces >= 0; decimalPlaces--)
+        {
+            var coordinateFormat = decimalPlaces == 0 ? "0" : $"0.{new string('#', decimalPlaces)}";
+            source = FormatSource(boundingBox, coordinateFormat);
+            if (source.Length <= MaxSourceFieldLength)
+            {
+                return source;
+            }
+        }
+
+        return FormatSource(boundingBox, "G6");
+    }
+
+    private static string FormatSource(BoundingBox boundingBox, string coordinateFormat)
+    {
         var coordinates = string.Join(
             ",",
-            boundingBox.Polygon.Select(value => value.ToString("G17", CultureInfo.InvariantCulture)));
+            boundingBox.Polygon.Select(value => value.ToString(coordinateFormat, CultureInfo.InvariantCulture)));
 
         return $"D({boundingBox.Page},{coordinates})";
     }

@@ -46,7 +46,8 @@ public sealed class FieldMapper : IFieldMapper
                 column,
                 ExtractValue(field.Value),
                 ExtractConfidence(field.Value),
-                ExtractBoundingBox(field.Value)));
+                ExtractBoundingBox(field.Value),
+                ExtractType(field.Value)));
         }
 
         return mapped;
@@ -140,6 +141,13 @@ public sealed class FieldMapper : IFieldMapper
 
         return null;
     }
+
+    internal static string ExtractType(JsonElement field)
+        => field.ValueKind == JsonValueKind.Object
+            && field.TryGetProperty("type", out var type)
+            && type.ValueKind == JsonValueKind.String
+                ? type.GetString() ?? "string"
+                : "string";
 
     internal static double ExtractConfidence(JsonElement field)
         => field.ValueKind == JsonValueKind.Object

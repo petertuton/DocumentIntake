@@ -80,9 +80,52 @@ public sealed class DataverseClientTests
     }
 
     [Fact]
+    public void BuildRecord_EmitsDataverseNativeTypes()
+    {
+        var form = CreateForm() with
+        {
+            Fields =
+            [
+                new FieldValue("cr417_field2", "2024-02-03", 0.9, null, "date"),
+                new FieldValue("cr417_field3", "true", 0.9, null, "boolean"),
+                new FieldValue("cr417_field4", "12345", 0.9, null, "integer"),
+            ],
+        };
+
+        var record = DataverseClient.BuildRecord(form);
+
+        Assert.IsType<DateTimeOffset>(record["cr417_field2"]);
+        Assert.Equal(true, record["cr417_field3"]);
+        Assert.Equal(12345L, record["cr417_field4"]);
+    }
+
+    [Fact]
     public void FormatSource_ReturnsNullWithoutBoundingBox()
     {
         Assert.Null(DataverseClient.FormatSource(null));
+    }
+
+    [Fact]
+    public void FormatSource_ReducesCoordinatePrecisionWhenValueExceedsDataverseLimit()
+    {
+        var box = new BoundingBox(
+            12,
+            [
+                0.12345678901234567,
+                1.9876543210987654,
+                2.1234567890123457,
+                1.9876543210987654,
+                2.1234567890123457,
+                3.9876543210987654,
+                0.12345678901234567,
+                3.9876543210987654,
+            ]);
+
+        var source = DataverseClient.FormatSource(box);
+
+        Assert.NotNull(source);
+        Assert.True(source!.Length <= 100);
+        Assert.StartsWith("D(12,", source, StringComparison.Ordinal);
     }
 
     [Fact]

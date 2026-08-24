@@ -190,15 +190,20 @@ override; anything left unset falls back to the default. `FormMappings` is a lis
 dictionary keyed by classification, because Azure App Service settings become environment
 variables and classification names such as `hipp-application` contain a hyphen, which isn't a
 valid environment variable name character. For example, to route `hipp-application` documents to
-the `cr417_annotatedpdf` entity set:
+the `cr417_annotatedpdfs` entity set:
 
 ```powershell
 az functionapp config appsettings set `
   -g (azd env get-value AZURE_RESOURCE_GROUP) `
   -n (azd env get-value AZURE_FUNCTION_APP_NAME) `
   --settings Dataverse__FormMappings__0__Classification=hipp-application `
-             Dataverse__FormMappings__0__EntitySetName=cr417_annotatedpdf
+             Dataverse__FormMappings__0__EntitySetName=cr417_annotatedpdfs
 ```
+
+`EntitySetName` must be the table's pluralized Web API collection name, not its logical/schema
+name (e.g. `cr417_annotatedpdf` is the logical name; `cr417_annotatedpdfs` is the entity set). Look
+up the correct value with `GET {EnvironmentUrl}/api/data/v9.2/EntityDefinitions(LogicalName='<logical name>')?$select=EntitySetName`
+if unsure — using the logical name causes Dataverse to return HTTP 404 with error code `0x80060888`.
 
 If `Dataverse__AuthMode` is `ClientSecret`, a mapping's `ClientSecretTenantId`, `ClientSecretClientId`,
 and `ClientSecretValue` must be set together (or all left blank to use the defaults) — startup

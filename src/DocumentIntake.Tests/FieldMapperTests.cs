@@ -56,6 +56,7 @@ public sealed class FieldMapperTests
 
         var total = mapped.Single(f => f.Column == "new_totalamount");
         Assert.Equal("1250.75", total.Value);
+        Assert.Equal("number", total.Type);
         Assert.Null(total.BoundingBox);
     }
 
@@ -139,6 +140,14 @@ public sealed class FieldMapperTests
         using var document = JsonDocument.Parse("""{ "valueString": "x" }""");
         Assert.Equal(0d, FieldMapper.ExtractConfidence(document.RootElement));
     }
+
+      [Fact]
+      public void ExtractType_DefaultsToStringWhenAbsent()
+      {
+        using var document = JsonDocument.Parse("""{ "valueString": "x" }""");
+
+        Assert.Equal("string", FieldMapper.ExtractType(document.RootElement));
+      }
 
     [Fact]
     public void ParseSource_ReadsPageAndPolygon()
