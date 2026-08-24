@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using DocumentIntake.Functions.Models;
 using DocumentIntake.Functions.Options;
@@ -85,11 +86,109 @@ public sealed class ContentUnderstandingClient : IContentUnderstandingClient
 
         return status?.ToUpperInvariant() switch
         {
-            "SUCCEEDED" => new AnalysisResult(AnalysisStatus.Succeeded, body),
+            "SUCCEEDED" => new AnalysisResult(AnalysisStatus.Succeeded, ExtractResultPayload(document.RootElement, body)),
             "FAILED" or "CANCELED" => new AnalysisResult(AnalysisStatus.Failed, body, ExtractError(document.RootElement)),
             "NOTSTARTED" => new AnalysisResult(AnalysisStatus.NotStarted, null),
             _ => new AnalysisResult(AnalysisStatus.Running, null),
         };
+    }
+
+    // Content Understanding embeds full OCR markdown/pages/tables per content entry, which can run into
+    // multiple megabytes; the monitor and Dataverse only need the classification/extraction outcome.
+    // The classifier reports its category inside "segments" (not directly on the content entry), so
+    // that must be retained too or classification silently breaks.
+    private static readonly string[] RetainedContentProperties = ["category", "confidence", "fields", "segments"];
+
+    /// <summary>Trims the "result" node down to classification/field data so the monitor can render it.</summary>
+    internal static string ExtractResultPayload(JsonElement root, string rawBody)
+    {
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("result", out var result)
+            || result.ValueKind != JsonValueKind.Object)
+        {
+            return rawBody;
+        }
+
+        if (!result.TryGetProperty("contents", out var contents) || contents.ValueKind != JsonValueKind.Array)
+        {
+            return result.GetRawText();
+        }
+
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            writer.WriteStartObject();
+            writer.WriteStartArray("contents");
+
+            foreach (var content in contents.EnumerateArray())
+            {
+                writer.WriteStartObject();
+
+                foreach (var propertyName in RetainedContentProperties)
+                {
+                    if (!content.TryGetProperty(propertyName, out var value))
+                    {
+                        continue;
+                    }
+
+                    writer.WritePropertyName(propertyName);
+
+                    // Each extracted field also echoes character "spans" into the source OCR text;
+                    // nothing downstream uses them, so drop them to keep only name/type/value/confidence/source.
+                    if (propertyName == "fields")
+                    {
+                        WriteWithoutSpans(value, writer);
+                    }
+                    else
+                    {
+                        value.WriteTo(writer);
+                    }
+                }
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static void WriteWithoutSpans(JsonElement element, Utf8JsonWriter writer)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                writer.WriteStartObject();
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (property.NameEquals("spans"))
+                    {
+                        continue;
+                    }
+
+                    writer.WritePropertyName(property.Name);
+                    WriteWithoutSpans(property.Value, writer);
+                }
+
+                writer.WriteEndObject();
+                break;
+
+            case JsonValueKind.Array:
+                writer.WriteStartArray();
+                foreach (var item in element.EnumerateArray())
+                {
+                    WriteWithoutSpans(item, writer);
+                }
+
+                writer.WriteEndArray();
+                break;
+
+            default:
+                element.WriteTo(writer);
+                break;
+        }
     }
 
     private async Task<AnalysisOperation> SubmitAsync(string analyzerId, Uri blobUri, CancellationToken cancellationToken)

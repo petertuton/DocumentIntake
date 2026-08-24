@@ -4,6 +4,43 @@ using DocumentIntake.Functions.Services;
 
 namespace DocumentIntake.Tests;
 
+public sealed class AnalysisResultTests
+{
+    [Fact]
+    public void Serialize_EmbedsJsonPayload_InsteadOfEscapingIt()
+    {
+        var result = new AnalysisResult(AnalysisStatus.Succeeded, """{"contents":[{"category":"hipp-application"}]}""");
+
+        var json = JsonSerializer.Serialize(result);
+
+        Assert.DoesNotContain("\\\"contents\\\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"payload\":{\"contents\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Serialize_KeepsNonJsonPayload_AsPlainString()
+    {
+        var result = new AnalysisResult(AnalysisStatus.Failed, "HTTP 500: server error");
+
+        var json = JsonSerializer.Serialize(result);
+
+        Assert.Contains("\"payload\":\"HTTP 500: server error\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RoundTrip_DeserializesEmbeddedJsonPayload_BackToRawJsonString()
+    {
+        var original = new AnalysisResult(AnalysisStatus.Succeeded, """{"contents":[{"category":"hipp-application"}]}""");
+
+        var json = JsonSerializer.Serialize(original);
+        var roundTripped = JsonSerializer.Deserialize<AnalysisResult>(json);
+
+        Assert.NotNull(roundTripped);
+        using var payloadDocument = JsonDocument.Parse(roundTripped!.Payload!);
+        Assert.Equal("hipp-application", payloadDocument.RootElement.GetProperty("contents")[0].GetProperty("category").GetString());
+    }
+}
+
 public sealed class ContentUnderstandingClientTests
 {
     [Theory]
@@ -36,6 +73,102 @@ public sealed class ContentUnderstandingClientTests
 
         Assert.Null(ContentUnderstandingClient.FindFirstCategory(document.RootElement));
         Assert.Null(ContentUnderstandingClient.FindFirstConfidence(document.RootElement));
+    }
+
+    [Fact]
+    public void ExtractResultPayload_ReturnsResultNode_WhenPresent()
+    {
+        const string body = """
+        {
+          "status": "Succeeded",
+          "result": { "contents": [ { "fields": { "claimNumber": { "valueString": "CLM-1" } } } ] }
+        }
+        """;
+
+        using var document = JsonDocument.Parse(body);
+        var payload = ContentUnderstandingClient.ExtractResultPayload(document.RootElement, body);
+
+        using var result = JsonDocument.Parse(payload);
+        Assert.True(result.RootElement.TryGetProperty("contents", out _));
+        Assert.False(result.RootElement.TryGetProperty("status", out _));
+    }
+
+    [Fact]
+    public void ExtractResultPayload_RetainsSegmentCategory_ForClassifierResults()
+    {
+        // Real Content Understanding classifier responses put "category" inside "segments", not
+        // directly on the content entry - dropping "segments" during trimming breaks classification.
+        const string body = """
+        {
+          "status": "Succeeded",
+          "result": {
+            "contents": [
+              {
+                "path": "input1",
+                "markdown": "large ocr text that should be dropped",
+                "segments": [ { "segmentId": "segment1", "category": "hipp-application" } ]
+              }
+            ]
+          }
+        }
+        """;
+
+        using var document = JsonDocument.Parse(body);
+        var payload = ContentUnderstandingClient.ExtractResultPayload(document.RootElement, body);
+
+        Assert.Equal("hipp-application", ContentUnderstandingClient.FindFirstCategory(JsonDocument.Parse(payload).RootElement));
+        Assert.DoesNotContain("large ocr text", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExtractResultPayload_FallsBackToRawBody_WhenResultMissing()
+    {
+        const string body = """{ "status": "Succeeded" }""";
+
+        using var document = JsonDocument.Parse(body);
+        var payload = ContentUnderstandingClient.ExtractResultPayload(document.RootElement, body);
+
+        Assert.Equal(body, payload);
+    }
+
+    [Fact]
+    public void ExtractResultPayload_DropsSpans_ButKeepsTypeValueConfidenceAndSource()
+    {
+        const string body = """
+        {
+          "status": "Succeeded",
+          "result": {
+            "contents": [
+              {
+                "fields": {
+                  "HippNumber": {
+                    "type": "integer",
+                    "valueInteger": 70004,
+                    "spans": [ { "offset": 3209, "length": 5 } ],
+                    "confidence": 0.709,
+                    "source": "D(2,4.5758,1.4395,4.9470,1.4400,4.9470,1.5363,4.5758,1.5334)"
+                  }
+                }
+              }
+            ]
+          }
+        }
+        """;
+
+        using var document = JsonDocument.Parse(body);
+        var payload = ContentUnderstandingClient.ExtractResultPayload(document.RootElement, body);
+
+        Assert.DoesNotContain("spans", payload, StringComparison.Ordinal);
+        Assert.Contains('\n', payload);
+
+        using var result = JsonDocument.Parse(payload);
+        var field = result.RootElement.GetProperty("contents")[0].GetProperty("fields").GetProperty("HippNumber");
+        Assert.Equal("integer", field.GetProperty("type").GetString());
+        Assert.Equal(70004, field.GetProperty("valueInteger").GetInt32());
+        Assert.Equal(0.709, field.GetProperty("confidence").GetDouble(), 3);
+        Assert.Equal(
+            "D(2,4.5758,1.4395,4.9470,1.4400,4.9470,1.5363,4.5758,1.5334)",
+            field.GetProperty("source").GetString());
     }
 }
 
