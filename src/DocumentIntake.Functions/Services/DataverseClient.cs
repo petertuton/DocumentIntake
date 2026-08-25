@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Azure.Core;
 using DocumentIntake.Functions.Models;
 using DocumentIntake.Functions.Options;
@@ -22,12 +23,23 @@ public sealed class DataverseClient : IDataverseClient
 {
     public const string HttpClientName = "dataverse";
 
+    private const int MaxExtractedJsonLength = 200_000;
+    private const int MaxSourcePrecisionDecimalPlaces = 6;
+    private const int MinSourcePrecisionDecimalPlaces = 2;
     private const int MaxSourceFieldLength = 100;
 
     private readonly HttpClient _http;
     private readonly DataverseOptions _options;
     private readonly DataverseTokenCredentialFactory _credentialFactory;
     private readonly ILogger<DataverseClient> _logger;
+
+    internal sealed record ExtractedJsonBuildResult(
+        string Json,
+        bool UsedPrecisionReduction,
+        int? AppliedDecimalPlaces,
+        bool DroppedEntries,
+        int OriginalEntryCount,
+        int FinalEntryCount);
 
     public DataverseClient(
         HttpClient http,
@@ -62,7 +74,21 @@ public sealed class DataverseClient : IDataverseClient
             CultureInfo.InvariantCulture,
             $"{target.EnvironmentUrl.TrimEnd('/')}/api/data/{_options.ApiVersion}/{target.EntitySetName}");
 
-        var record = BuildRecord(form);
+        var extractedJson = BuildExtractedJsonWithDiagnostics(form.AnalyzePayload);
+        if (extractedJson.UsedPrecisionReduction || extractedJson.DroppedEntries)
+        {
+            _logger.LogInformation(
+                "Compacted cr417_extractedjson for {BlobName}. PrecisionReduced={PrecisionReduced} DecimalPlaces={DecimalPlaces} EntriesDropped={EntriesDropped} Entries={FinalEntries}/{OriginalEntries} PayloadLength={PayloadLength}.",
+                form.SourceBlobName,
+                extractedJson.UsedPrecisionReduction,
+                extractedJson.AppliedDecimalPlaces,
+                extractedJson.DroppedEntries,
+                extractedJson.FinalEntryCount,
+                extractedJson.OriginalEntryCount,
+                extractedJson.Json.Length);
+        }
+
+        var record = BuildRecord(form, extractedJson.Json);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
         {
@@ -135,16 +161,19 @@ public sealed class DataverseClient : IDataverseClient
     }
 
     internal static Dictionary<string, object?> BuildRecord(MappedForm form)
+        => BuildRecord(form, BuildExtractedJson(form.AnalyzePayload));
+
+    internal static Dictionary<string, object?> BuildRecord(MappedForm form, string extractedJson)
     {
         var record = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
-            ["cr417_primarycolumn"] = form.CompletedBlobUrl
+            ["cr417_primarycolumn"] = form.CompletedBlobUrl,
+            ["cr417_extractedjson"] = extractedJson,
             // ["new_formtype"] = form.FormType,
             // ["new_sourceblobname"] = form.SourceBlobName,
             // ["new_completedbloburl"] = form.CompletedBlobUrl,
             // ["new_processedutc"] = form.ProcessedUtc.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
             // ["new_classificationconfidence"] = form.ClassificationConfidence,
-            // ["new_extractionjson"] = JsonSerializer.Serialize(form.Fields),
         };
 
         foreach (var field in form.Fields)
@@ -156,6 +185,133 @@ public sealed class DataverseClient : IDataverseClient
 
         return record;
     }
+
+    internal static string BuildExtractedJson(string? analyzePayload)
+        => BuildExtractedJsonWithDiagnostics(analyzePayload).Json;
+
+    internal static ExtractedJsonBuildResult BuildExtractedJsonWithDiagnostics(string? analyzePayload)
+        => BuildExtractedJsonWithDiagnostics(analyzePayload, MaxExtractedJsonLength, MinSourcePrecisionDecimalPlaces);
+
+    internal static ExtractedJsonBuildResult BuildExtractedJsonWithDiagnostics(
+        string? analyzePayload,
+        int maxLength,
+        int minDecimalPlaces)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxLength, 2);
+        ArgumentOutOfRangeException.ThrowIfNegative(minDecimalPlaces);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(minDecimalPlaces, MaxSourcePrecisionDecimalPlaces);
+
+        var contents = ExtractContentsArray(analyzePayload);
+        var originalEntryCount = contents.Count;
+        var json = SerializeArray(contents);
+        if (json.Length <= maxLength)
+        {
+            return new ExtractedJsonBuildResult(json, false, null, false, originalEntryCount, contents.Count);
+        }
+
+        for (var decimalPlaces = MaxSourcePrecisionDecimalPlaces; decimalPlaces >= minDecimalPlaces; decimalPlaces--)
+        {
+            var candidate = CloneArray(contents);
+            ReduceSourcePrecision(candidate, decimalPlaces);
+            json = SerializeArray(candidate);
+            if (json.Length <= maxLength)
+            {
+                return new ExtractedJsonBuildResult(json, true, decimalPlaces, false, originalEntryCount, candidate.Count);
+            }
+        }
+
+        var minPrecisionContents = CloneArray(contents);
+        ReduceSourcePrecision(minPrecisionContents, minDecimalPlaces);
+
+        while (minPrecisionContents.Count > 0)
+        {
+            minPrecisionContents.RemoveAt(minPrecisionContents.Count - 1);
+            json = SerializeArray(minPrecisionContents);
+            if (json.Length <= maxLength)
+            {
+                return new ExtractedJsonBuildResult(json, true, minDecimalPlaces, true, originalEntryCount, minPrecisionContents.Count);
+            }
+        }
+
+        return new ExtractedJsonBuildResult("[]", true, minDecimalPlaces, true, originalEntryCount, 0);
+    }
+
+    internal static string BuildExtractedJson(string? analyzePayload, int maxLength, int minDecimalPlaces)
+        => BuildExtractedJsonWithDiagnostics(analyzePayload, maxLength, minDecimalPlaces).Json;
+
+    private static JsonArray ExtractContentsArray(string? analyzePayload)
+    {
+        if (string.IsNullOrWhiteSpace(analyzePayload))
+        {
+            return [];
+        }
+
+        JsonNode? parsed;
+        try
+        {
+            parsed = JsonNode.Parse(analyzePayload);
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+
+        return parsed switch
+        {
+            JsonArray array => CloneArray(array),
+            JsonObject obj when obj["contents"] is JsonArray array => CloneArray(array),
+            _ => [],
+        };
+    }
+
+    private static JsonArray CloneArray(JsonArray value)
+        => (JsonArray)(value.DeepClone() ?? new JsonArray());
+
+    private static void ReduceSourcePrecision(JsonNode? node, int decimalPlaces)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                foreach (var property in obj.ToArray())
+                {
+                    if (property.Key.Equals("source", StringComparison.Ordinal)
+                        && property.Value is JsonValue jsonValue
+                        && jsonValue.TryGetValue<string>(out var source)
+                        && source is not null)
+                    {
+                        obj[property.Key] = ReduceSourcePrecision(source, decimalPlaces);
+                        continue;
+                    }
+
+                    ReduceSourcePrecision(property.Value, decimalPlaces);
+                }
+
+                break;
+
+            case JsonArray array:
+                foreach (var item in array)
+                {
+                    ReduceSourcePrecision(item, decimalPlaces);
+                }
+
+                break;
+        }
+    }
+
+    private static string ReduceSourcePrecision(string source, int decimalPlaces)
+    {
+        var parsed = FieldMapper.ParseSource(source);
+        if (parsed is null)
+        {
+            return source;
+        }
+
+        var coordinateFormat = decimalPlaces == 0 ? "0" : $"0.{new string('#', decimalPlaces)}";
+        return FormatSource(parsed, coordinateFormat);
+    }
+
+    private static string SerializeArray(JsonArray array)
+        => array.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
 
     private static object? ConvertValue(FieldValue field)
     {

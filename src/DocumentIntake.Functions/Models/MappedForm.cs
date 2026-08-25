@@ -33,6 +33,9 @@ public sealed record MappedForm
     [JsonPropertyName("classificationConfidence")]
     public double ClassificationConfidence { get; init; }
 
+    [JsonPropertyName("analyzePayload")]
+    public string? AnalyzePayload { get; init; }
+
     [JsonPropertyName("fields")]
     public IReadOnlyList<FieldValue> Fields { get; init; } = [];
 }

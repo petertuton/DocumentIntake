@@ -42,6 +42,7 @@ public sealed class MapFieldsActivity
             FormType = request.FormType,
             SourceBlobName = request.SourceBlobName,
             ClassificationConfidence = request.ClassificationConfidence,
+            AnalyzePayload = request.AnalyzePayload,
             ProcessedUtc = DateTimeOffset.UtcNow,
             Fields = fields,
         };

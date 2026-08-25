@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using DocumentIntake.Functions.Models;
 using DocumentIntake.Functions.Services;
 
@@ -181,6 +182,22 @@ public sealed class DataverseClientTests
         CompletedBlobUrl = "https://acct.blob.core.windows.net/completed/invoice.pdf",
         ProcessedUtc = new DateTimeOffset(2024, 5, 6, 7, 8, 9, TimeSpan.Zero),
         ClassificationConfidence = 0.91,
+                AnalyzePayload = """
+                {
+                    "contents": [
+                        {
+                            "fields": {
+                                "HippNumber": {
+                                    "type": "integer",
+                                    "valueInteger": 70004,
+                                    "confidence": 0.709,
+                                    "source": "D(2,4.5758,1.4395,4.9470,1.4400,4.9470,1.5363,4.5758,1.5334)"
+                                }
+                            }
+                        }
+                    ]
+                }
+                """,
         Fields =
         [
             new FieldValue("new_claimnumber", "CLM-1", 0.95, new BoundingBox(1, [0, 0, 1, 0, 1, 1, 0, 1])),
@@ -193,9 +210,72 @@ public sealed class DataverseClientTests
     {
         var record = DataverseClient.BuildRecord(CreateForm());
 
-        Assert.Equal(7, record.Count);
+        Assert.Equal(8, record.Count);
+        Assert.True(record.TryGetValue("cr417_extractedjson", out var extractedJson));
+        var contents = JsonSerializer.Deserialize<JsonElement>(Assert.IsType<string>(extractedJson));
+        Assert.Equal(JsonValueKind.Array, contents.ValueKind);
+        Assert.Equal(1, contents.GetArrayLength());
         Assert.DoesNotContain("new_formtype", record.Keys);
         Assert.DoesNotContain("new_extractionjson", record.Keys);
+    }
+
+    [Fact]
+    public void BuildExtractedJson_ReturnsArrayFromEnvelopePayload()
+    {
+        var payload = """
+        {
+          "contents": [
+            { "category": "hipp-application" },
+            { "category": "unknown" }
+          ]
+        }
+        """;
+
+        var json = DataverseClient.BuildExtractedJson(payload);
+        var element = JsonSerializer.Deserialize<JsonElement>(json);
+
+        Assert.Equal(JsonValueKind.Array, element.ValueKind);
+        Assert.Equal(2, element.GetArrayLength());
+    }
+
+    [Fact]
+    public void BuildExtractedJson_ReducesSourcePrecisionBeforeDroppingEntries()
+    {
+        const string source = "D(1,0.123456789,1.234567891,2.345678912,3.456789123,4.567891234,5.678912345,6.789123456,7.891234567)";
+        var payload = BuildPayload(entryCount: 4, source: source);
+        var unbounded = DataverseClient.BuildExtractedJson(payload, maxLength: int.MaxValue, minDecimalPlaces: 2);
+        var maxLength = unbounded.Length - 2;
+
+        var json = DataverseClient.BuildExtractedJson(payload, maxLength, minDecimalPlaces: 2);
+        var contents = JsonSerializer.Deserialize<JsonElement>(json);
+
+        Assert.Equal(4, contents.GetArrayLength());
+
+        var reducedSource = contents[0].GetProperty("fields").GetProperty("claim").GetProperty("source").GetString();
+        Assert.NotNull(reducedSource);
+        Assert.NotEqual(source, reducedSource);
+        Assert.Contains("0.123457", reducedSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildExtractedJson_DropsEntriesOnlyAfterSourcePrecisionReduction()
+    {
+        var payload = BuildPayload(entryCount: 30, source: "D(1,0.123456789,1.234567891,2.345678912,3.456789123,4.567891234,5.678912345,6.789123456,7.891234567)");
+
+        var json = DataverseClient.BuildExtractedJson(payload, maxLength: 1200, minDecimalPlaces: 2);
+        var contents = JsonSerializer.Deserialize<JsonElement>(json);
+
+        Assert.True(contents.GetArrayLength() < 30);
+        var source = contents[0].GetProperty("fields").GetProperty("claim").GetProperty("source").GetString();
+        Assert.NotNull(source);
+        Assert.Contains("0.12", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("0.123", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildExtractedJson_ReturnsEmptyArrayForMalformedPayload()
+    {
+        Assert.Equal("[]", DataverseClient.BuildExtractedJson("not json"));
     }
 
     [Fact]
@@ -279,5 +359,29 @@ public sealed class DataverseClientTests
     public void ExtractRecordId_ReturnsNullWhenNoGuidIsPresent(string body)
     {
         Assert.Null(DataverseClient.ExtractRecordId(body));
+    }
+
+    private static string BuildPayload(int entryCount, string source)
+    {
+        JsonArray contents = [];
+
+        for (var i = 0; i < entryCount; i++)
+        {
+            contents.Add(new JsonObject
+            {
+                ["fields"] = new JsonObject
+                {
+                    ["claim"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["valueString"] = "ok",
+                        ["source"] = source,
+                    },
+                },
+            });
+        }
+
+        return new JsonObject { ["contents"] = contents }
+            .ToJsonString(new JsonSerializerOptions { WriteIndented = false });
     }
 }
