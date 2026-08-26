@@ -210,13 +210,29 @@ public sealed class DataverseClientTests
     {
         var record = DataverseClient.BuildRecord(CreateForm());
 
-        Assert.Equal(8, record.Count);
+        Assert.Equal(9, record.Count);
         Assert.True(record.TryGetValue("cr417_extractedjson", out var extractedJson));
         var contents = JsonSerializer.Deserialize<JsonElement>(Assert.IsType<string>(extractedJson));
         Assert.Equal(JsonValueKind.Array, contents.ValueKind);
         Assert.Equal(1, contents.GetArrayLength());
         Assert.DoesNotContain("new_formtype", record.Keys);
         Assert.DoesNotContain("new_extractionjson", record.Keys);
+    }
+
+    [Theory]
+    [InlineData(
+        "AAMkADFkZjc3YjhlLWRjOWEtNDk2Ny05M2FlLTM0NjY3MjdlMjg2YQBGAAAAAADoAhreGH-IRLLACKD-cIcVBwDphItCyIXzT4YFBFBvJX8JAAAAAAEMAADphItCyIXzT4YFBFBvJX8JAAGp1AGIAAA=_HIPP_Synthetic_Sample_01.pd",
+        "https://github.com/melody-N07/Conduent-HIPP/blob/main/artifacts/samples/HIPP_Synthetic_Sample_01.pdf")]
+    [InlineData("HIPP_Synthetic_Sample_07.pdf", "https://github.com/melody-N07/Conduent-HIPP/blob/main/artifacts/samples/HIPP_Synthetic_Sample_07.pdf")]
+    public void BuildSampleGitHubUrl_ExtractsSampleIdFromBlobName(string sourceBlobName, string expectedUrl)
+    {
+        Assert.Equal(expectedUrl, DataverseClient.BuildSampleGitHubUrl(sourceBlobName));
+    }
+
+    [Fact]
+    public void BuildSampleGitHubUrl_ReturnsNullWhenBlobNameDoesNotMatchSamplePattern()
+    {
+        Assert.Null(DataverseClient.BuildSampleGitHubUrl("sample-hipp-application.pdf"));
     }
 
     [Fact]

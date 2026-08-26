@@ -28,6 +28,11 @@ public sealed class DataverseClient : IDataverseClient
     private const int MinSourcePrecisionDecimalPlaces = 2;
     private const int MaxSourceFieldLength = 100;
 
+    // Demo-only: maps the original blob name to a public sample file for stakeholder walkthroughs.
+    private static readonly System.Text.RegularExpressions.Regex SampleBlobNamePattern = new(
+        @"HIPP_Synthetic_Sample_(\d+)",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private readonly HttpClient _http;
     private readonly DataverseOptions _options;
     private readonly DataverseTokenCredentialFactory _credentialFactory;
@@ -169,6 +174,7 @@ public sealed class DataverseClient : IDataverseClient
         {
             ["cr417_primarycolumn"] = form.CompletedBlobUrl,
             ["cr417_extractedjson"] = extractedJson,
+            ["cr417_sharepointurl"] = BuildSampleGitHubUrl(form.SourceBlobName),
             // ["new_formtype"] = form.FormType,
             // ["new_sourceblobname"] = form.SourceBlobName,
             // ["new_completedbloburl"] = form.CompletedBlobUrl,
@@ -184,6 +190,19 @@ public sealed class DataverseClient : IDataverseClient
         }
 
         return record;
+    }
+
+    internal static string? BuildSampleGitHubUrl(string sourceBlobName)
+    {
+        var match = SampleBlobNamePattern.Match(sourceBlobName);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"https://github.com/melody-N07/Conduent-HIPP/blob/main/artifacts/samples/HIPP_Synthetic_Sample_{match.Groups[1].Value}.pdf");
     }
 
     internal static string BuildExtractedJson(string? analyzePayload)
