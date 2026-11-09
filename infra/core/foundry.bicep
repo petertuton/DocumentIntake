@@ -63,6 +63,9 @@ resource completionDeployment 'Microsoft.CognitiveServices/accounts/deployments@
       version: '2025-08-07'
     }
   }
+  dependsOn: [
+    project
+  ]
 }
 
 resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {

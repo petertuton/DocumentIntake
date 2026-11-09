@@ -63,65 +63,96 @@ export function parsePayload(text: string, options?: ParseOptions): MappedForm {
   }
 
   const record = raw as Record<string, unknown>;
-  if (Array.isArray(record.fields)) {
-    return readMappedForm(record);
+  let form: MappedForm;
+  if (typeof record.analyzePayload === 'string' && record.analyzePayload.trim()) {
+    const extracted = parsePayload(record.analyzePayload, options);
+    form = {
+      ...extracted,
+      formType: String(record.formType ?? extracted.formType),
+      sourceBlobName: String(record.sourceBlobName ?? extracted.sourceBlobName),
+      completedBlobUrl: record.completedBlobUrl == null
+        ? extracted.completedBlobUrl
+        : String(record.completedBlobUrl),
+      processedUtc: String(record.processedUtc ?? extracted.processedUtc),
+      classificationConfidence: Number(record.classificationConfidence ?? extracted.classificationConfidence),
+    };
+  } else if (Array.isArray(record.fields)) {
+    form = readMappedForm(record);
+  } else if (contentUnderstandingContents(record) !== null) {
+    form = readContentUnderstandingPayload(contentUnderstandingContents(record)!, options?.completedBlobUrl ?? null);
+  } else {
+    form = readFlatRecord(record);
   }
 
-  if (isContentUnderstandingPayload(record)) {
-    return readContentUnderstandingPayload(record, options?.completedBlobUrl ?? null);
-  }
-
-  return readFlatRecord(record);
+  return options?.completedBlobUrl != null
+    ? { ...form, completedBlobUrl: options.completedBlobUrl }
+    : form;
 }
 
-function isContentUnderstandingPayload(record: Record<string, unknown>): boolean {
-  const payload = record.payload;
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
-    return false;
+function contentUnderstandingContents(record: Record<string, unknown>): unknown[] | null {
+  for (const candidate of [record.payload, record.result, record]) {
+    if (typeof candidate === 'object' && candidate !== null && !Array.isArray(candidate)) {
+      const contents = (candidate as Record<string, unknown>).contents;
+      if (Array.isArray(contents)) {
+        return contents;
+      }
+    }
   }
 
-  const contents = (payload as Record<string, unknown>).contents;
-  return Array.isArray(contents);
+  return null;
 }
 
 function readContentUnderstandingPayload(
-  record: Record<string, unknown>,
+  contents: unknown[],
   completedBlobUrl: string | null,
 ): MappedForm {
-  const payload = record.payload as Record<string, unknown>;
-  const contents = payload.contents as unknown[];
-  const first = contents[0];
-  if (typeof first !== 'object' || first === null || Array.isArray(first)) {
-    throw new PayloadError('Content Understanding payload is missing payload.contents[0].');
+  if (contents.length === 0) {
+    throw new PayloadError('Content Understanding payload contains no content items.');
   }
 
-  const fieldsRecord = (first as Record<string, unknown>).fields;
-  if (typeof fieldsRecord !== 'object' || fieldsRecord === null || Array.isArray(fieldsRecord)) {
-    throw new PayloadError('Content Understanding payload is missing payload.contents[0].fields.');
-  }
+  const fields: FieldValue[] = [];
+  function appendField(column: string, value: unknown): void {
+    const field = typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : null;
 
-  const fields = Object.entries(fieldsRecord).map(([column, value]) => {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      return {
-        column,
-        value: null,
-        confidence: 0,
-        boundingBox: null,
-        type: 'string',
-      } satisfies FieldValue;
+    if (field?.valueObject && typeof field.valueObject === 'object' && !Array.isArray(field.valueObject)) {
+      for (const [name, nested] of Object.entries(field.valueObject)) {
+        appendField(`${column}.${name}`, nested);
+      }
+      return;
     }
 
-    const field = value as Record<string, unknown>;
-    const type = String(field.type ?? 'string');
-    const fieldValue = extractContentUnderstandingValue(field, type);
+    if (Array.isArray(field?.valueArray)) {
+      field.valueArray.forEach((nested, index) => appendField(`${column}[${index}]`, nested));
+      return;
+    }
 
-    return {
+    const type = String(field?.type ?? 'string');
+    const fieldValue = field ? extractContentUnderstandingValue(field, type) : value;
+
+    fields.push({
       column,
       value: fieldValue == null ? null : String(fieldValue),
-      confidence: Number(field.confidence ?? 0),
-      boundingBox: parseSource(field.source as string | null | undefined),
+      confidence: Number(field?.confidence ?? 0),
+      boundingBox: parseSource(field?.source as string | null | undefined),
       type,
-    } satisfies FieldValue;
+    });
+  }
+
+  contents.forEach((content, index) => {
+    if (typeof content !== 'object' || content === null || Array.isArray(content)) {
+      throw new PayloadError(`Content Understanding contents[${index}] is not an object.`);
+    }
+
+    const fieldsRecord = (content as Record<string, unknown>).fields;
+    if (typeof fieldsRecord !== 'object' || fieldsRecord === null || Array.isArray(fieldsRecord)) {
+      throw new PayloadError(`Content Understanding contents[${index}].fields is missing.`);
+    }
+
+    for (const [name, value] of Object.entries(fieldsRecord)) {
+      appendField(contents.length > 1 ? `contents[${index}].${name}` : name, value);
+    }
   });
 
   return {

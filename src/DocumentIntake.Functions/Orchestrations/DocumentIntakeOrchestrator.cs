@@ -94,7 +94,7 @@ public static class DocumentIntakeOrchestrator
                 MapFieldsActivity.Name,
                 new MapFieldsRequest(
                     payload,
-                    classification.FormType ?? "hipp-application",
+                    classification.FormType ?? ContentUnderstandingOptions.DefaultFormCategory,
                     request.BlobName,
                     classification.Confidence),
                 RetryOptions);

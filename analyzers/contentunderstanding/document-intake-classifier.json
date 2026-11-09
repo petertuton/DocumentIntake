@@ -1,13 +1,16 @@
 {
-  "description": "Classifies inbound documents as Virginia DMAS Health Insurance Premium Payment (HIPP) application material or unrelated content.",
+  "description": "Classifies inbound Health Insurance Premium Payment (HIPP) application material by state program or as unrelated content.",
   "tags": {
     "project": "document-intake"
   },
   "baseAnalyzerId": "prebuilt-document",
   "config": {
     "contentCategories": {
-      "hipp-application": {
+      "hipp-application-virginia": {
         "description": "A Virginia DMAS HIPP application or HIPP correspondence form. It contains HIPP branding or a hipp_application heading, an Application ID, a Correspondence Type, policyholder information, household information, employment or insurance information, and HIPP agreement fields."
+      },
+      "hipp-application-nevada": {
+        "description": "A Nevada Department of Health and Human Service (HMS) Health Insurance Premium Payment (HIPP) program application form. It contains the Nevada seal at the top-left of the page, alongside the NV HMS header, the form heading, head of household information, employer information, health insurance information, household members information., the fax number of the department (being 1-877-640-3414, email contact information for the department (being customerservice@mynvhipp.com) and the mailing address, HMS postal addresses, plus a HIPAA release authority page."
       },
       "other": {
         "description": "Any document that is not a HIPP application or HIPP correspondence form, including standalone paystubs, insurance cards, plan summaries, employer verification forms, correspondence, signature pages, or unrelated forms."

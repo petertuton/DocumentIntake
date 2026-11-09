@@ -236,7 +236,7 @@ public sealed class ContentUnderstandingClient : IContentUnderstandingClient
         return segments.Length > 0 ? segments[^1] : operationLocation;
     }
 
-    private ClassificationResult ParseClassification(string? payload)
+    internal ClassificationResult ParseClassification(string? payload)
     {
         if (string.IsNullOrWhiteSpace(payload))
         {
@@ -253,7 +253,10 @@ public sealed class ContentUnderstandingClient : IContentUnderstandingClient
             return new ClassificationResult(false, null, 0, "No category returned by classifier.");
         }
 
-        var isKnown = string.Equals(category, _options.KnownFormCategory, StringComparison.OrdinalIgnoreCase)
+        var matchesCategory = _options.KnownFormCategories.Count == 0
+            ? string.Equals(category, _options.KnownFormCategory, StringComparison.OrdinalIgnoreCase)
+            : _options.KnownFormCategories.Contains(category, StringComparer.OrdinalIgnoreCase);
+        var isKnown = matchesCategory
             && confidence >= _options.MinimumClassificationConfidence;
 
         var reason = isKnown

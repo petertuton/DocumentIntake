@@ -7,7 +7,7 @@ artifacts/
 *.user
 *.suo
 .vs/
-.vscode/
+
 .idea/
 
 # Azure Functions
