@@ -1,4 +1,7 @@
-# Runbook
+---
+title: Runbook
+description: Diagnose document intake failures and recover deployment hooks and document processing.
+---
 
 > The storage account only accepts private endpoint traffic. Run the `az storage` commands below
 > from the jump box described in [manual-setup.md](./manual-setup.md#0-reaching-private-endpoint-only-storage-with-az-cli),
@@ -57,6 +60,39 @@ Durable history also lives in the storage account's `DocumentIntakeHub` tables
 | `DocumentTooLargeException` | Attachment above the configured size guard | Handle the document out of band. |
 | Dataverse `401`/`403` | Auth not configured, or the application user lacks the security role | See [manual-setup.md](manual-setup.md). |
 | Payload logged but nothing created in Dataverse | `Dataverse__Enabled` is `false` | Expected until the auth decision is made. Set it to `true`. |
+
+## Deployment hook recovery
+
+The `Microsoft.App` preprovision check and analyzer postprovision hook are required.
+Their failures stop `azd up`; a postprovision failure does not roll back infrastructure
+that has already been created. Neither hook changes the Function managed identity's roles.
+
+| Symptom | Action |
+| ------- | ------ |
+| `Microsoft.App` registration denied or timed out | Confirm the azd subscription and CLI login, ask the subscription administrator to register the provider if needed, then rerun `azd up`. |
+| CLI subscription/tenant or principal mismatch | Run `az login --tenant <tenant-id>`, `az account set --subscription <subscription-id>`, and `azd auth login --tenant-id <tenant-id>` using the same identity. |
+| Signed-in principal object ID lookup failed | Verify the CLI login and directory access with your administrator. Users require their own profile lookup; service principals require lookup of their own service principal object. Do not substitute an application/client ID for an object ID. |
+| Cannot ensure Cognitive Services User | Ask an RBAC administrator to grant the deployment principal Cognitive Services User at the Foundry account scope, then rerun registration. Existing grants are preserved. |
+| Analyzer registration exhausted bounded retries | Confirm the role has propagated and the service is reachable. Rerun registration after correcting the cause. No partial registration is reported as complete. |
+| Event Grid reports subscription not found | Correct the CLI tenant/subscription and rerun `scripts/register-event-subscription.ps1 -SubscriptionId <subscription-id>`; no infrastructure redeployment is needed. |
+
+To recover analyzer registration, select the original azd environment, align both
+logins, and run the following. Supply the original deployment principal's object ID
+and type explicitly when the automatic hook variables are not present in your shell
+or stored in the environment. Both users and service principals are supported; the
+CLI login must match the supplied object ID.
+
+```powershell
+./scripts/register-analyzers.ps1 `
+  -SubscriptionId '<deployment-subscription-id>' `
+  -TenantId '<deployment-tenant-id>' `
+  -PrincipalId '<deployment-principal-object-id>' `
+  -PrincipalType User
+```
+
+After registration succeeds, run `azd deploy` if `azd up` stopped before deploying
+the application. A `403` during this hook concerns the CLI deployment identity;
+a `403` during document processing concerns the Function identity described above.
 
 ## Replaying a failed blob
 

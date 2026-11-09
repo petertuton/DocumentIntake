@@ -11,17 +11,28 @@ services:
     host: function
 
 hooks:
+  preprovision:
+    windows:
+      shell: pwsh
+      run: ./scripts/register-providers.ps1
+      interactive: false
+      continueOnError: false
+    posix:
+      shell: sh
+      run: pwsh ./scripts/register-providers.ps1
+      interactive: false
+      continueOnError: false
   postprovision:
     windows:
       shell: pwsh
       run: ./scripts/register-analyzers.ps1
       interactive: false
-      continueOnError: true
+      continueOnError: false
     posix:
       shell: sh
       run: pwsh ./scripts/register-analyzers.ps1
       interactive: false
-      continueOnError: true
+      continueOnError: false
   postdeploy:
     windows:
       shell: pwsh
