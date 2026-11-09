@@ -40,8 +40,8 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'deployment-common.ps1')
 
 function Get-RegistrationToken {
-    param([string]$SubscriptionId)
-    $Token = Invoke-DeploymentAz -ArgumentList @('account', 'get-access-token', '--subscription', $SubscriptionId, '--resource', 'https://cognitiveservices.azure.com', '--query', 'accessToken', '-o', 'tsv') -Context 'Content Understanding token acquisition'
+    param([string]$SubscriptionId, [DateTimeOffset]$Deadline = [DateTimeOffset]::MaxValue)
+    $Token = Invoke-DeploymentAz -ArgumentList @('account', 'get-access-token', '--subscription', $SubscriptionId, '--resource', 'https://cognitiveservices.azure.com', '--query', 'accessToken', '-o', 'tsv') -Context 'Content Understanding token acquisition' -Deadline $Deadline
     if (-not $Token) { throw 'Could not acquire a Content Understanding access token. Run az login for the deployment tenant.' }
     return $Token
 }
@@ -79,7 +79,7 @@ function Invoke-RegistrationRequest {
             return
         }
         if ($Status -eq 401 -and -not $ReacquiredToken) {
-            $Headers.Authorization = "Bearer $(Get-RegistrationToken $SubscriptionId)"
+            $Headers.Authorization = "Bearer $(Get-RegistrationToken $SubscriptionId -Deadline $Deadline)"
             $ReacquiredToken = $true
         }
         elseif ($Status -notin @(0, 403, 408, 429, 500, 502, 503, 504)) {
@@ -130,7 +130,8 @@ function Confirm-RegistrationAccess {
     $ListArguments = @('role', 'assignment', 'list', '--assignee-object-id', $PrincipalId, '--role', $RoleId, '--scope', $Scope, '--include-inherited', '--fill-principal-name', 'false', '--subscription', $SubscriptionId, '-o', 'json')
     $Assignments = @(Invoke-DeploymentAz -ArgumentList $ListArguments -Context 'Foundry role lookup' | ConvertFrom-Json | Where-Object {
         $_.principalId -eq $PrincipalId -and $_.roleDefinitionId.Split('/')[-1] -eq $RoleId -and
-        ($_.scope -eq $Scope -or $Scope.StartsWith("$($_.scope)/", [StringComparison]::OrdinalIgnoreCase))
+        ($_.scope -eq $Scope -or $Scope.StartsWith("$($_.scope)/", [StringComparison]::OrdinalIgnoreCase) -or
+        $_.scope -match '^/providers/Microsoft.Management/managementGroups/[^/]+$')
     })
     if ($Assignments.Count -gt 0) { return }
     try {

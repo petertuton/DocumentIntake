@@ -29,17 +29,17 @@ function Register-DeploymentProvider {
     )
     $SubscriptionId = Resolve-DeploymentValue $SubscriptionId 'AZURE_SUBSCRIPTION_ID'
     $TenantId = Resolve-DeploymentValue $TenantId 'AZURE_TENANT_ID'
-    $null = Confirm-DeploymentSubscription $SubscriptionId $TenantId
+    $Deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
+    $null = Confirm-DeploymentSubscription $SubscriptionId $TenantId -Deadline $Deadline
     $ShowArguments = @('provider', 'show', '--namespace', 'Microsoft.App', '--subscription', $SubscriptionId, '--query', 'registrationState', '-o', 'tsv')
-    $State = Invoke-DeploymentAz -ArgumentList $ShowArguments -Context 'Microsoft.App registration lookup'
+    $State = Invoke-DeploymentAz -ArgumentList $ShowArguments -Context 'Microsoft.App registration lookup' -Deadline $Deadline
     if ($State -eq 'Registered') {
         Write-Host 'Microsoft.App is already registered.'
         return
     }
-    $null = Invoke-DeploymentAz -ArgumentList @('provider', 'register', '--namespace', 'Microsoft.App', '--subscription', $SubscriptionId, '-o', 'none') -Context 'Microsoft.App registration'
-    $Deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
+    $null = Invoke-DeploymentAz -ArgumentList @('provider', 'register', '--namespace', 'Microsoft.App', '--subscription', $SubscriptionId, '-o', 'none') -Context 'Microsoft.App registration' -Deadline $Deadline
     for ($Attempt = 0; $Attempt -lt 30 -and [DateTimeOffset]::UtcNow -lt $Deadline; $Attempt++) {
-        $State = Invoke-DeploymentAz -ArgumentList $ShowArguments -Context 'Microsoft.App registration lookup'
+        $State = Invoke-DeploymentAz -ArgumentList $ShowArguments -Context 'Microsoft.App registration lookup' -Deadline $Deadline
         if ($State -eq 'Registered') {
             Write-Host 'Microsoft.App registration complete.'
             return

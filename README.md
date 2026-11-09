@@ -163,7 +163,7 @@ Provisioning creates the Azure AI Services account, its Microsoft Foundry projec
 the model deployments. The `scripts/register-analyzers.ps1` postprovision hook verifies
 the Azure CLI tenant and principal object ID against the deployment context and checks
 that the endpoint belongs to that account. It reuses an existing **Cognitive Services
-User** grant, including a direct inherited grant, or assigns that role at the account
+User** grant, including an inherited grant from a parent scope, or assigns that role at the account
 scope. Creating a missing grant requires `Microsoft.Authorization/roleAssignments/write`
 at that scope, such as an appropriately scoped RBAC administrator role. Contributor
 alone cannot create role assignments. The Function managed identity's separate role

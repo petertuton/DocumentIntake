@@ -20,6 +20,11 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         Mock Write-Host { }
         Mock Start-Sleep { }
         Mock Resolve-DeploymentValue { $Value }
+        Mock Invoke-DeploymentCommand {
+            $global:LASTEXITCODE = 0
+            $Output = & az @ArgumentList
+            @{ ExitCode = $global:LASTEXITCODE; Output = $Output }
+        }
         Mock az {
             $global:LASTEXITCODE = 0
             if ($args[0] -eq 'account' -and $args[1] -eq 'show') { return '{"id":"sub","tenantId":"tenant","user":{"type":"user","name":"user@example.test"}}' }
@@ -72,6 +77,12 @@ Describe 'Analyzer registration' -Tag 'Unit' {
 
     It 'Reuses an inherited assignment' {
         $script:Assignments[0].scope = '/subscriptions/sub'
+        Register-IntakeAnalyzer @script:Parameters
+        Should -Invoke az -Times 0 -ParameterFilter { $args[2] -eq 'create' }
+    }
+
+    It 'Reuses a management-group assignment returned by the inherited-scope query' {
+        $script:Assignments[0].scope = '/providers/Microsoft.Management/managementGroups/parent'
         Register-IntakeAnalyzer @script:Parameters
         Should -Invoke az -Times 0 -ParameterFilter { $args[2] -eq 'create' }
     }

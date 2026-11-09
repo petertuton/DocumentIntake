@@ -13,6 +13,11 @@ Describe 'Provider registration' -Tag 'Unit' {
         Mock Start-Sleep { }
         Mock Get-AzdValue { $null }
         Mock Resolve-DeploymentValue { $Value }
+        Mock Invoke-DeploymentCommand {
+            $global:LASTEXITCODE = 0
+            $Output = & az @ArgumentList
+            @{ ExitCode = $global:LASTEXITCODE; Output = $Output }
+        }
         Mock az {
             $global:LASTEXITCODE = 0
             if ($args[0] -eq 'account') { return '{"id":"sub","tenantId":"tenant"}' }
@@ -108,5 +113,25 @@ Describe 'Deployment configuration' -Tag 'Unit' {
         $script:Hooks.preprovision[$Platform].run | Should -Be "${Prefix}./scripts/register-providers.ps1"
         $script:Hooks.postprovision[$Platform].run | Should -Be "${Prefix}./scripts/register-analyzers.ps1"
         $script:Hooks.postdeploy[$Platform].continueOnError | Should -BeTrue
+    }
+}
+
+Describe 'Native deployment command boundary' -Tag 'Unit' {
+    It 'Captures output and nonzero exit status without exposing stderr' {
+        $Result = Invoke-DeploymentCommand -Command (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', "Write-Output 'native-output'; [Console]::Error.WriteLine('sensitive-stderr'); exit 7")
+        $Result.ExitCode | Should -Be 7
+        $Result.Output | Should -Be 'native-output'
+    }
+
+    It 'Kills a stuck native process tree at the timeout' {
+        $Clock = [Diagnostics.Stopwatch]::StartNew()
+        { Invoke-DeploymentCommand -Command (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile', '-NonInteractive', '-Command', 'while ($true) {}') -TimeoutSeconds 1 } | Should -Throw '*timed out*'
+        $Clock.Elapsed.TotalSeconds | Should -BeLessThan 8
+    }
+
+    It 'Does not start a CLI process after its deadline' {
+        Mock Invoke-DeploymentCommand { throw 'Unexpected process start' }
+        { Invoke-DeploymentAz -ArgumentList @('account', 'show') -Context test -Deadline ([DateTimeOffset]::UtcNow.AddSeconds(-1)) } | Should -Throw '*test failed*'
+        Should -Invoke Invoke-DeploymentCommand -Times 0
     }
 }
