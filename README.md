@@ -139,15 +139,61 @@ src/DocumentIntake.Tests                xUnit
 
 ## Deploy
 
+Authenticate Azure CLI before Azure Developer CLI (`azd`). They keep separate login
+contexts; use the same deployment identity and tenant in both, and select the same
+subscription in the azd environment.
+
 ```powershell
-azd auth login
-azd up
+$tenantId = '<deployment-tenant-id>'
+$subscriptionId = '<deployment-subscription-id>'
+az login --tenant $tenantId
+az account set --subscription $subscriptionId
+az account show --query '{subscription:id, tenant:tenantId, identity:user.name}'
+azd auth login --tenant-id $tenantId
+azd up --subscription $subscriptionId
 ```
 
-`azd up` provisions the Azure AI Services account, a Microsoft Foundry project beneath that
-account, and the model deployments. It then runs `scripts/register-analyzers.ps1` as a
-postprovision hook to register the classifier and analyzer against the Content Understanding
-tool endpoint. The project endpoint is exposed separately for project-scoped Foundry APIs.
+`azd up` first runs `scripts/register-providers.ps1` to ensure `Microsoft.App` is
+registered in the selected subscription. It skips an existing registration and waits
+up to five minutes for a new registration. Missing configuration, authorization failures,
+or a timeout stop provisioning. The deployment identity needs permission to register
+resource providers in the subscription.
+
+Provisioning creates the Azure AI Services account, its Microsoft Foundry project, and
+the model deployments. The `scripts/register-analyzers.ps1` postprovision hook verifies
+the Azure CLI tenant and principal object ID against the deployment context and checks
+that the endpoint belongs to that account. It reuses an existing **Cognitive Services
+User** grant, including an inherited grant from a parent scope, or assigns that role at the account
+scope. Creating a missing grant requires `Microsoft.Authorization/roleAssignments/write`
+at that scope, such as an appropriately scoped RBAC administrator role. Contributor
+alone cannot create role assignments. The Function managed identity's separate role
+does not authorize the deployment caller.
+
+The scripts resolve explicit parameters first, then process environment values, then
+the selected azd environment. The analyzer hook uses `AZURE_SUBSCRIPTION_ID`,
+`AZURE_TENANT_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_FOUNDRY_ACCOUNT_NAME`,
+`AZURE_PRINCIPAL_ID` (object ID, not application/client ID), and `AZURE_PRINCIPAL_TYPE`
+(`User` or `ServicePrincipal`). Caller verification uses `az ad signed-in-user show`
+for users or `az ad sp show` for service principals. If directory lookup is blocked,
+resolve the identity/login policy with your administrator; the script will not guess
+an object ID or grant a different identity access.
+
+Analyzer registration retries transient failures and RBAC propagation for at most ten
+attempts and ten minutes per PATCH/PUT operation, with 30-second request timeouts.
+Persistent authentication failures and invalid definitions stop immediately. If the
+postprovision hook fails, infrastructure may already exist, but `azd up` stops before
+application deployment. Correct access and rerun registration, then `azd deploy`;
+see [deployment recovery](docs/runbook.md#deployment-hook-recovery). The project endpoint
+remains separate for project-scoped Foundry APIs.
+
+If Event Grid setup failed because Azure CLI was signed into the wrong tenant or
+subscription, no infrastructure redeployment is needed:
+
+```powershell
+az login --tenant $tenantId
+az account set --subscription $subscriptionId
+./scripts/register-event-subscription.ps1 -SubscriptionId $subscriptionId
+```
 
 Two steps still need a human — see [docs/manual-setup.md](docs/manual-setup.md):
 
