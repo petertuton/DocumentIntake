@@ -1,7 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DocumentIntake.Functions.Models;
+using DocumentIntake.Functions.Options;
 using DocumentIntake.Functions.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace DocumentIntake.Tests;
 
@@ -44,6 +48,83 @@ public sealed class AnalysisResultTests
 
 public sealed class ContentUnderstandingClientTests
 {
+    [Theory]
+    [InlineData("hipp-application-virginia", 0.9, true)]
+    [InlineData("hipp-application-nevada", 0.9, true)]
+    [InlineData("HIPP-APPLICATION-NEVADA", 0.6, true)]
+    [InlineData("hipp-application-nevada", 0.59, false)]
+    [InlineData("other", 0.99, false)]
+    [InlineData("hipp-application-unknown", 0.99, false)]
+    public void GivenMultipleStates_WhenParsingClassification_AppliesAllowlistAndConfidence(
+        string category, double confidence, bool expectedKnown)
+    {
+        var options = new ContentUnderstandingOptions
+        {
+            KnownFormCategories = ["hipp-application-virginia", "hipp-application-nevada"],
+        };
+        using var http = new HttpClient();
+        var client = new ContentUnderstandingClient(http, Options.Create(options), NullLogger<ContentUnderstandingClient>.Instance);
+        var payload = JsonSerializer.Serialize(new { contents = new[] { new { category, confidence } } });
+
+        var result = client.ParseClassification(payload);
+
+        Assert.Equal(expectedKnown, result.IsKnownForm);
+        Assert.Equal(category, result.FormType);
+    }
+
+    [Theory]
+    [InlineData("hipp-application-virginia", true)]
+    [InlineData("hipp-application-nevada", false)]
+    [InlineData("other", false)]
+    public void GivenDefaultOptions_WhenParsingClassification_DefaultsToVirginia(string category, bool expectedKnown)
+    {
+        using var http = new HttpClient();
+        var client = new ContentUnderstandingClient(
+            http, Options.Create(new ContentUnderstandingOptions()), NullLogger<ContentUnderstandingClient>.Instance);
+        var payload = JsonSerializer.Serialize(new { category, confidence = 0.9 });
+
+        Assert.Equal(expectedKnown, client.ParseClassification(payload).IsKnownForm);
+    }
+
+    [Fact]
+    public void GivenLegacyCategorySetting_WhenParsingClassification_AcceptsConfiguredCategory()
+    {
+        using var http = new HttpClient();
+        var client = new ContentUnderstandingClient(
+            http, Options.Create(new ContentUnderstandingOptions { KnownFormCategory = "hipp-application" }),
+            NullLogger<ContentUnderstandingClient>.Instance);
+
+        Assert.True(client.ParseClassification("""{"category":"hipp-application","confidence":0.9}""").IsKnownForm);
+    }
+
+    [Fact]
+    public void GivenExplicitCategoryList_WhenParsingClassification_DoesNotAlsoAcceptFallback()
+    {
+        using var http = new HttpClient();
+        var client = new ContentUnderstandingClient(
+            http, Options.Create(new ContentUnderstandingOptions { KnownFormCategories = ["hipp-application-nevada"] }),
+            NullLogger<ContentUnderstandingClient>.Instance);
+
+        Assert.False(client.ParseClassification("""{"category":"hipp-application-virginia","confidence":0.9}""").IsKnownForm);
+    }
+
+    [Fact]
+    public void GivenIndexedCategorySettings_WhenBindingOptions_AcceptsBothStates()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ContentUnderstanding:KnownFormCategories:0"] = "hipp-application-virginia",
+            ["ContentUnderstanding:KnownFormCategories:1"] = "hipp-application-nevada",
+        }).Build();
+        var options = configuration.GetSection(ContentUnderstandingOptions.SectionName).Get<ContentUnderstandingOptions>()!;
+        using var http = new HttpClient();
+        var client = new ContentUnderstandingClient(http, Options.Create(options), NullLogger<ContentUnderstandingClient>.Instance);
+
+        Assert.Equal(2, options.KnownFormCategories.Count);
+        Assert.True(client.ParseClassification("""{"category":"hipp-application-virginia","confidence":0.9}""").IsKnownForm);
+        Assert.True(client.ParseClassification("""{"category":"hipp-application-nevada","confidence":0.9}""").IsKnownForm);
+    }
+
     [Theory]
     [InlineData("https://ep.services.ai.azure.com/contentunderstanding/analyzerResults/abc-123?api-version=2025-11-01", "abc-123")]
     [InlineData("https://ep/contentunderstanding/analyzerResults/abc-123", "abc-123")]

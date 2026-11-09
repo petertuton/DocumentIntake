@@ -1,4 +1,9 @@
-# Document Intake
+---
+title: Document Intake
+description: Configure and run a state-aware HIPP document intake pipeline with shared field extraction.
+---
+
+## Document Intake
 
 Email attachments arrive in an M365 mailbox, get classified and OCR'd by Azure AI Foundry
 Content Understanding, mapped onto a known form's columns, and pushed to Dataverse — with the
@@ -163,7 +168,8 @@ Set as app settings by `infra/core/functionapp.bicep`; mirror them in `local.set
 | `ContentUnderstanding__ApiVersion` | Pinned API version (`2025-11-01`). |
 | `ContentUnderstanding__ClassifierId` | Classifier to call in step 1. |
 | `ContentUnderstanding__AnalyzerId` | Analyzer to call in step 3. |
-| `ContentUnderstanding__KnownFormCategory` | Category treated as a HIPP application (default `hipp-application`). |
+| `ContentUnderstanding__KnownFormCategory` | Single-category fallback when no category list is configured (default `hipp-application-virginia`). Existing single-category settings remain supported. |
+| `ContentUnderstanding__KnownFormCategories__<index>` | Accepted categories as a 0-based indexed list. A nonempty list replaces the single-category fallback. Matching is case-insensitive; confidence must still meet the threshold. |
 | `ContentUnderstanding__MinimumClassificationConfidence` | Below this, the file goes to `ignored`. |
 | `ContentUnderstanding__MaxDocumentSizeBytes` | Larger files fail fast (default 200 MB). |
 | `Dataverse__EnvironmentUrl` | e.g. `https://contoso.crm.dynamics.com`. Default used when a classification has no mapping. |
@@ -175,6 +181,42 @@ Set as app settings by `infra/core/functionapp.bicep`; mirror them in `local.set
 The polling schedule (2s → 30s ramp) and the 10-minute poll timeout are compiled constants, not
 configuration: the orchestrator must produce identical decisions on every replay, so they cannot
 come from settings that might change between replays.
+
+### Supporting multiple state forms
+
+The classifier identifies the state; the Function's category allowlist decides whether to
+process it. Adding or registering a classifier category does not automatically allow it.
+The local settings sample enables both current categories. Set the same values in an
+existing Function App's application settings to process both states:
+
+```text
+ContentUnderstanding__KnownFormCategories__0=hipp-application-virginia
+ContentUnderstanding__KnownFormCategories__1=hipp-application-nevada
+```
+
+Without the list, only `KnownFormCategory` is accepted, defaulting to
+`hipp-application-virginia`. An existing setting of `hipp-application` remains an exact
+single-category match; it is not an alias for the new state-specific names.
+
+Both states use `document_intake_form_analyzer`. Its shared schema matches equivalent
+field meanings across layouts, orders household entries by their position, and leaves
+absent fields unset. It does not rely on state branding, fixed page positions, numbered
+headings, or a fixed HIPP number length. Field IDs and types remain unchanged so the
+existing field map can be reused. The schema currently supports up to 14 household
+members, and `HippNumber` remains numeric; alphanumeric identifiers or additional fields
+require a schema and mapping review. Validate extraction accuracy against representative
+forms from each state before relying on the results.
+
+To add another state, register its classifier category and add the exact category to the
+indexed list. Extend the shared schema and field map only for genuinely new data. Add a
+`Dataverse__FormMappings` entry only when the state's destination or credentials differ;
+otherwise it uses the default Dataverse target.
+
+After updating the analyzer, re-run `scripts/register-analyzers.ps1`, deploy the Function
+code, and apply the category settings. Re-upload previously ignored files into `inbox`
+with a new blob name or ETag; completed ignored orchestrations are not retried automatically.
+Check the `intakeReason` blob metadata when a file is ignored: the reason distinguishes
+an unaccepted category from a result below the confidence threshold.
 
 ## Output shape
 

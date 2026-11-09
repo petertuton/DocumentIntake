@@ -9,7 +9,9 @@
     "ContentUnderstanding__ApiVersion": "2025-11-01",
     "ContentUnderstanding__ClassifierId": "document_intake_classifier",
     "ContentUnderstanding__AnalyzerId": "document_intake_form_analyzer",
-    "ContentUnderstanding__KnownFormCategory": "hipp-application",
+    "ContentUnderstanding__KnownFormCategory": "hipp-application-virginia",
+    "ContentUnderstanding__KnownFormCategories__0": "hipp-application-virginia",
+    "ContentUnderstanding__KnownFormCategories__1": "hipp-application-nevada",
     "ContentUnderstanding__MinimumClassificationConfidence": "0.6",
     "Dataverse__EnvironmentUrl": "https://<org>.crm.dynamics.com",
     "Dataverse__EntitySetName": "new_documentintakes",
@@ -18,7 +20,7 @@
     "Dataverse__ClientSecretClientId": "<application-client-id>",
     "Dataverse__ClientSecretValue": "<store-in-key-vault-for-azure>",
     "Dataverse__Enabled": "false",
-    "Dataverse__FormMappings__0__Classification": "hipp-application",
+    "Dataverse__FormMappings__0__Classification": "hipp-application-virginia",
     "Dataverse__FormMappings__0__EntitySetName": "cr417_annotatedpdf"
   }
 }

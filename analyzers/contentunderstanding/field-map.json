@@ -1,6 +1,6 @@
 {
   "$comment": "Maps Content Understanding field names to the column names used by the target form/table. Fields not listed here are ignored by the mapping activity.",
-  "formType": "hipp-application",
+  "formType": "hipp-application-virginia",
   "columns": {
     "PolicyholderLastName": "cr417_field1",
     "PolicyholderDateOfBirth": "cr417_field2",

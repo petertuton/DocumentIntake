@@ -1,5 +1,5 @@
 {
-  "description": "Extracts Virginia DMAS HIPP application fields from classified documents using OCR, layout analysis, and source confidence. Household members are emitted as explicitly named scalar fields so repeated form labels can be resolved by their numbered household section.",
+  "description": "Extracts shared Health Insurance Premium Payment (HIPP) application and correspondence fields across state programs using OCR, layout analysis, and source confidence. Match fields by meaning rather than state branding, exact headings, section numbers, or page positions. Household members are emitted as explicitly named scalar fields in their listed order.",
   "baseAnalyzerId": "prebuilt-document",
   "tags": {
     "project": "document-intake"
@@ -12,7 +12,7 @@
   },
   "fieldSchema": {
     "name": "HippApplication",
-    "description": "Fields captured from a Virginia DMAS HIPP application or HIPP correspondence form.",
+    "description": "Shared fields from state HIPP applications and correspondence forms. Recognize equivalent labels across layouts. Policyholder fields describe the insurance subscriber or employee; use applicant or head-of-household information only when the form identifies that person as the policyholder. Household ordinal fields describe the corresponding listed household member, including in unnumbered tables; do not assume household members exclude the policyholder. Preserve member order and do not duplicate policyholder information into an empty household entry. Extract only information supported by the document; leave absent or inapplicable fields unset rather than inventing values or treating missing checkboxes as false.",
     "fields": {
       "ApplicationId": {
         "type": "string",
@@ -22,12 +22,12 @@
       "CorrespondenceType": {
         "type": "string",
         "method": "extract",
-        "description": "The selected HIPP correspondence type: New HIPP application, Quarterly Paystub Submission, Annual HIPP Renewal, or Information change."
+        "description": "The application or correspondence type indicated on the document, such as a new application, renewal, paystub submission, or information change. Preserve the document's wording; leave unset if no type is indicated."
       },
       "HippNumber": {
         "type": "integer",
         "method": "extract",
-        "description": "The five-digit HIPP number, when present."
+        "description": "The numeric HIPP program or case number, when present. Do not assume a fixed number of digits or substitute a Medicaid ID or insurance policy number."
       },
       "PolicyholderFirstName": {
         "type": "string",
@@ -97,772 +97,772 @@
       "Household1stPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 1st Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 1st listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household1stPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 1st Person in Household section."
+        "description": "Middle initial from the 1st listed household member."
       },
       "Household1stPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 1st Person in Household section."
+        "description": "Last name from the 1st listed household member."
       },
       "Household1stPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 1st Person in Household section."
+        "description": "Date of birth from the 1st listed household member."
       },
       "Household1stPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 1st Person in Household section."
+        "description": "Selected relationship to the policyholder from the 1st listed household member."
       },
       "Household1stPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 1st Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 1st listed household member, when Other is selected."
       },
       "Household1stPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 1st Person in Household gets Medicaid."
+        "description": "Whether the 1st listed household member gets Medicaid."
       },
       "Household1stPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 1st Person in Household section."
+        "description": "Medicaid ID from the 1st listed household member."
       },
       "Household1stPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 1st Person in Household gets Medicare."
+        "description": "Whether the 1st listed household member gets Medicare."
       },
       "Household1stPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 1st Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 1st listed household member is covered under the policyholder's insurance."
       },
       "Household1stPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 1st Person in Household section."
+        "description": "Social Security Number from the 1st listed household member."
       },
       "Household2ndPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 2nd Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 2nd listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household2ndPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 2nd Person in Household section."
+        "description": "Middle initial from the 2nd listed household member."
       },
       "Household2ndPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 2nd Person in Household section."
+        "description": "Last name from the 2nd listed household member."
       },
       "Household2ndPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 2nd Person in Household section."
+        "description": "Date of birth from the 2nd listed household member."
       },
       "Household2ndPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 2nd Person in Household section."
+        "description": "Selected relationship to the policyholder from the 2nd listed household member."
       },
       "Household2ndPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 2nd Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 2nd listed household member, when Other is selected."
       },
       "Household2ndPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 2nd Person in Household gets Medicaid."
+        "description": "Whether the 2nd listed household member gets Medicaid."
       },
       "Household2ndPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 2nd Person in Household section."
+        "description": "Medicaid ID from the 2nd listed household member."
       },
       "Household2ndPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 2nd Person in Household gets Medicare."
+        "description": "Whether the 2nd listed household member gets Medicare."
       },
       "Household2ndPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 2nd Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 2nd listed household member is covered under the policyholder's insurance."
       },
       "Household2ndPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 2nd Person in Household section."
+        "description": "Social Security Number from the 2nd listed household member."
       },
       "Household3rdPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 3rd Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 3rd listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household3rdPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 3rd Person in Household section."
+        "description": "Middle initial from the 3rd listed household member."
       },
       "Household3rdPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 3rd Person in Household section."
+        "description": "Last name from the 3rd listed household member."
       },
       "Household3rdPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 3rd Person in Household section."
+        "description": "Date of birth from the 3rd listed household member."
       },
       "Household3rdPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 3rd Person in Household section."
+        "description": "Selected relationship to the policyholder from the 3rd listed household member."
       },
       "Household3rdPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 3rd Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 3rd listed household member, when Other is selected."
       },
       "Household3rdPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 3rd Person in Household gets Medicaid."
+        "description": "Whether the 3rd listed household member gets Medicaid."
       },
       "Household3rdPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 3rd Person in Household section."
+        "description": "Medicaid ID from the 3rd listed household member."
       },
       "Household3rdPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 3rd Person in Household gets Medicare."
+        "description": "Whether the 3rd listed household member gets Medicare."
       },
       "Household3rdPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 3rd Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 3rd listed household member is covered under the policyholder's insurance."
       },
       "Household3rdPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 3rd Person in Household section."
+        "description": "Social Security Number from the 3rd listed household member."
       },
       "Household4thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 4th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 4th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household4thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 4th Person in Household section."
+        "description": "Middle initial from the 4th listed household member."
       },
       "Household4thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 4th Person in Household section."
+        "description": "Last name from the 4th listed household member."
       },
       "Household4thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 4th Person in Household section."
+        "description": "Date of birth from the 4th listed household member."
       },
       "Household4thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 4th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 4th listed household member."
       },
       "Household4thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 4th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 4th listed household member, when Other is selected."
       },
       "Household4thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 4th Person in Household gets Medicaid."
+        "description": "Whether the 4th listed household member gets Medicaid."
       },
       "Household4thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 4th Person in Household section."
+        "description": "Medicaid ID from the 4th listed household member."
       },
       "Household4thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 4th Person in Household gets Medicare."
+        "description": "Whether the 4th listed household member gets Medicare."
       },
       "Household4thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 4th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 4th listed household member is covered under the policyholder's insurance."
       },
       "Household4thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 4th Person in Household section."
+        "description": "Social Security Number from the 4th listed household member."
       },
       "Household5thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 5th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 5th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household5thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 5th Person in Household section."
+        "description": "Middle initial from the 5th listed household member."
       },
       "Household5thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 5th Person in Household section."
+        "description": "Last name from the 5th listed household member."
       },
       "Household5thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 5th Person in Household section."
+        "description": "Date of birth from the 5th listed household member."
       },
       "Household5thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 5th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 5th listed household member."
       },
       "Household5thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 5th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 5th listed household member, when Other is selected."
       },
       "Household5thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 5th Person in Household gets Medicaid."
+        "description": "Whether the 5th listed household member gets Medicaid."
       },
       "Household5thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 5th Person in Household section."
+        "description": "Medicaid ID from the 5th listed household member."
       },
       "Household5thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 5th Person in Household gets Medicare."
+        "description": "Whether the 5th listed household member gets Medicare."
       },
       "Household5thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 5th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 5th listed household member is covered under the policyholder's insurance."
       },
       "Household5thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 5th Person in Household section."
+        "description": "Social Security Number from the 5th listed household member."
       },
       "Household6thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 6th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 6th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household6thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 6th Person in Household section."
+        "description": "Middle initial from the 6th listed household member."
       },
       "Household6thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 6th Person in Household section."
+        "description": "Last name from the 6th listed household member."
       },
       "Household6thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 6th Person in Household section."
+        "description": "Date of birth from the 6th listed household member."
       },
       "Household6thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 6th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 6th listed household member."
       },
       "Household6thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 6th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 6th listed household member, when Other is selected."
       },
       "Household6thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 6th Person in Household gets Medicaid."
+        "description": "Whether the 6th listed household member gets Medicaid."
       },
       "Household6thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 6th Person in Household section."
+        "description": "Medicaid ID from the 6th listed household member."
       },
       "Household6thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 6th Person in Household gets Medicare."
+        "description": "Whether the 6th listed household member gets Medicare."
       },
       "Household6thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 6th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 6th listed household member is covered under the policyholder's insurance."
       },
       "Household6thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 6th Person in Household section."
+        "description": "Social Security Number from the 6th listed household member."
       },
       "Household7thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 7th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 7th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household7thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 7th Person in Household section."
+        "description": "Middle initial from the 7th listed household member."
       },
       "Household7thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 7th Person in Household section."
+        "description": "Last name from the 7th listed household member."
       },
       "Household7thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 7th Person in Household section."
+        "description": "Date of birth from the 7th listed household member."
       },
       "Household7thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 7th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 7th listed household member."
       },
       "Household7thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 7th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 7th listed household member, when Other is selected."
       },
       "Household7thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 7th Person in Household gets Medicaid."
+        "description": "Whether the 7th listed household member gets Medicaid."
       },
       "Household7thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 7th Person in Household section."
+        "description": "Medicaid ID from the 7th listed household member."
       },
       "Household7thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 7th Person in Household gets Medicare."
+        "description": "Whether the 7th listed household member gets Medicare."
       },
       "Household7thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 7th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 7th listed household member is covered under the policyholder's insurance."
       },
       "Household7thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 7th Person in Household section."
+        "description": "Social Security Number from the 7th listed household member."
       },
       "Household8thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 8th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 8th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household8thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 8th Person in Household section."
+        "description": "Middle initial from the 8th listed household member."
       },
       "Household8thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 8th Person in Household section."
+        "description": "Last name from the 8th listed household member."
       },
       "Household8thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 8th Person in Household section."
+        "description": "Date of birth from the 8th listed household member."
       },
       "Household8thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 8th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 8th listed household member."
       },
       "Household8thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 8th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 8th listed household member, when Other is selected."
       },
       "Household8thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 8th Person in Household gets Medicaid."
+        "description": "Whether the 8th listed household member gets Medicaid."
       },
       "Household8thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 8th Person in Household section."
+        "description": "Medicaid ID from the 8th listed household member."
       },
       "Household8thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 8th Person in Household gets Medicare."
+        "description": "Whether the 8th listed household member gets Medicare."
       },
       "Household8thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 8th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 8th listed household member is covered under the policyholder's insurance."
       },
       "Household8thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 8th Person in Household section."
+        "description": "Social Security Number from the 8th listed household member."
       },
       "Household9thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 9th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 9th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household9thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 9th Person in Household section."
+        "description": "Middle initial from the 9th listed household member."
       },
       "Household9thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 9th Person in Household section."
+        "description": "Last name from the 9th listed household member."
       },
       "Household9thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 9th Person in Household section."
+        "description": "Date of birth from the 9th listed household member."
       },
       "Household9thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 9th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 9th listed household member."
       },
       "Household9thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 9th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 9th listed household member, when Other is selected."
       },
       "Household9thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 9th Person in Household gets Medicaid."
+        "description": "Whether the 9th listed household member gets Medicaid."
       },
       "Household9thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 9th Person in Household section."
+        "description": "Medicaid ID from the 9th listed household member."
       },
       "Household9thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 9th Person in Household gets Medicare."
+        "description": "Whether the 9th listed household member gets Medicare."
       },
       "Household9thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 9th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 9th listed household member is covered under the policyholder's insurance."
       },
       "Household9thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 9th Person in Household section."
+        "description": "Social Security Number from the 9th listed household member."
       },
       "Household10thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 10th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 10th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household10thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 10th Person in Household section."
+        "description": "Middle initial from the 10th listed household member."
       },
       "Household10thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 10th Person in Household section."
+        "description": "Last name from the 10th listed household member."
       },
       "Household10thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 10th Person in Household section."
+        "description": "Date of birth from the 10th listed household member."
       },
       "Household10thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 10th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 10th listed household member."
       },
       "Household10thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 10th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 10th listed household member, when Other is selected."
       },
       "Household10thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 10th Person in Household gets Medicaid."
+        "description": "Whether the 10th listed household member gets Medicaid."
       },
       "Household10thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 10th Person in Household section."
+        "description": "Medicaid ID from the 10th listed household member."
       },
       "Household10thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 10th Person in Household gets Medicare."
+        "description": "Whether the 10th listed household member gets Medicare."
       },
       "Household10thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 10th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 10th listed household member is covered under the policyholder's insurance."
       },
       "Household10thPersonLastFourSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Last four digits of the Social Security Number from the 10th Person in Household section."
+        "description": "Last four digits of the Social Security Number from the 10th listed household member."
       },
       "Household11thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 11th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 11th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household11thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 11th Person in Household section."
+        "description": "Middle initial from the 11th listed household member."
       },
       "Household11thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 11th Person in Household section."
+        "description": "Last name from the 11th listed household member."
       },
       "Household11thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 11th Person in Household section."
+        "description": "Date of birth from the 11th listed household member."
       },
       "Household11thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 11th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 11th listed household member."
       },
       "Household11thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 11th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 11th listed household member, when Other is selected."
       },
       "Household11thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 11th Person in Household gets Medicaid."
+        "description": "Whether the 11th listed household member gets Medicaid."
       },
       "Household11thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 11th Person in Household section."
+        "description": "Medicaid ID from the 11th listed household member."
       },
       "Household11thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 11th Person in Household gets Medicare."
+        "description": "Whether the 11th listed household member gets Medicare."
       },
       "Household11thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 11th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 11th listed household member is covered under the policyholder's insurance."
       },
       "Household11thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 11th Person in Household section."
+        "description": "Social Security Number from the 11th listed household member."
       },
       "Household12thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 12th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 12th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household12thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 12th Person in Household section."
+        "description": "Middle initial from the 12th listed household member."
       },
       "Household12thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 12th Person in Household section."
+        "description": "Last name from the 12th listed household member."
       },
       "Household12thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 12th Person in Household section."
+        "description": "Date of birth from the 12th listed household member."
       },
       "Household12thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 12th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 12th listed household member."
       },
       "Household12thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 12th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 12th listed household member, when Other is selected."
       },
       "Household12thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 12th Person in Household gets Medicaid."
+        "description": "Whether the 12th listed household member gets Medicaid."
       },
       "Household12thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 12th Person in Household section."
+        "description": "Medicaid ID from the 12th listed household member."
       },
       "Household12thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 12th Person in Household gets Medicare."
+        "description": "Whether the 12th listed household member gets Medicare."
       },
       "Household12thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 12th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 12th listed household member is covered under the policyholder's insurance."
       },
       "Household12thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 12th Person in Household section."
+        "description": "Social Security Number from the 12th listed household member."
       },
       "Household13thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 13th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 13th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household13thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 13th Person in Household section."
+        "description": "Middle initial from the 13th listed household member."
       },
       "Household13thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 13th Person in Household section."
+        "description": "Last name from the 13th listed household member."
       },
       "Household13thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 13th Person in Household section."
+        "description": "Date of birth from the 13th listed household member."
       },
       "Household13thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 13th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 13th listed household member."
       },
       "Household13thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 13th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 13th listed household member, when Other is selected."
       },
       "Household13thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 13th Person in Household gets Medicaid."
+        "description": "Whether the 13th listed household member gets Medicaid."
       },
       "Household13thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 13th Person in Household section."
+        "description": "Medicaid ID from the 13th listed household member."
       },
       "Household13thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 13th Person in Household gets Medicare."
+        "description": "Whether the 13th listed household member gets Medicare."
       },
       "Household13thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 13th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 13th listed household member is covered under the policyholder's insurance."
       },
       "Household13thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 13th Person in Household section."
+        "description": "Social Security Number from the 13th listed household member."
       },
       "Household14thPersonFirstName": {
         "type": "string",
         "method": "extract",
-        "description": "First name from the 14th Person in Household section; do not use the policyholder's name."
+        "description": "First name from the 14th listed household member; use the policyholder's name only if that person is explicitly listed in this household entry."
       },
       "Household14thPersonMiddleInitial": {
         "type": "string",
         "method": "extract",
-        "description": "Middle initial from the 14th Person in Household section."
+        "description": "Middle initial from the 14th listed household member."
       },
       "Household14thPersonLastName": {
         "type": "string",
         "method": "extract",
-        "description": "Last name from the 14th Person in Household section."
+        "description": "Last name from the 14th listed household member."
       },
       "Household14thPersonDateOfBirth": {
         "type": "date",
         "method": "extract",
-        "description": "Date of birth from the 14th Person in Household section."
+        "description": "Date of birth from the 14th listed household member."
       },
       "Household14thPersonRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Selected relationship to the policyholder from the 14th Person in Household section."
+        "description": "Selected relationship to the policyholder from the 14th listed household member."
       },
       "Household14thPersonOtherRelationship": {
         "type": "string",
         "method": "extract",
-        "description": "Other relationship text from the 14th Person in Household section, when Other is selected."
+        "description": "Other relationship text from the 14th listed household member, when Other is selected."
       },
       "Household14thPersonGetsMedicaid": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 14th Person in Household gets Medicaid."
+        "description": "Whether the 14th listed household member gets Medicaid."
       },
       "Household14thPersonMedicaidId": {
         "type": "string",
         "method": "extract",
-        "description": "Medicaid ID from the 14th Person in Household section."
+        "description": "Medicaid ID from the 14th listed household member."
       },
       "Household14thPersonGetsMedicare": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 14th Person in Household gets Medicare."
+        "description": "Whether the 14th listed household member gets Medicare."
       },
       "Household14thPersonCoveredByInsurance": {
         "type": "boolean",
         "method": "extract",
-        "description": "Whether the 14th Person in Household is covered under the policyholder's insurance."
+        "description": "Whether the 14th listed household member is covered under the policyholder's insurance."
       },
       "Household14thPersonSocialSecurityNumber": {
         "type": "string",
         "method": "extract",
-        "description": "Social Security Number from the 14th Person in Household section."
+        "description": "Social Security Number from the 14th listed household member."
       },
       "EmployeeStatus": {
         "type": "string",
