@@ -46,6 +46,36 @@ function Get-RegistrationToken {
     return $Token
 }
 
+function Invoke-RegistrationHttp {
+    param(
+        [string]$Method, [string]$Uri, [string]$Body, [hashtable]$Headers,
+        [int]$TimeoutSeconds,
+        [System.Net.Http.HttpMessageHandler]$Handler
+    )
+    if (-not $Handler) {
+        $Handler = [System.Net.Http.HttpClientHandler]::new()
+        $Handler.AllowAutoRedirect = $false
+    }
+    $Client = [System.Net.Http.HttpClient]::new($Handler)
+    $Cancellation = [Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds($TimeoutSeconds))
+    $Request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new($Method), $Uri)
+    $Response = $null
+    try {
+        $Request.Content = [System.Net.Http.StringContent]::new($Body, [Text.Encoding]::UTF8, 'application/json')
+        foreach ($Name in $Headers.Keys) { $null = $Request.Headers.TryAddWithoutValidation($Name, [string]$Headers[$Name]) }
+        $Response = $Client.SendAsync($Request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead, $Cancellation.Token).GetAwaiter().GetResult()
+        $ResponseHeaders = @{}
+        foreach ($Header in $Response.Headers) { $ResponseHeaders[$Header.Key] = @($Header.Value) }
+        return @{ StatusCode = [int]$Response.StatusCode; Headers = $ResponseHeaders }
+    }
+    finally {
+        if ($Response) { $Response.Dispose() }
+        $Request.Dispose()
+        $Cancellation.Dispose()
+        $Client.Dispose()
+    }
+}
+
 function Invoke-RegistrationRequest {
     [CmdletBinding()]
     param(
@@ -66,11 +96,11 @@ function Invoke-RegistrationRequest {
         $Response = $null
         $Status = 0
         try {
-            $Response = Invoke-WebRequest -Method $Method -Uri $Uri -Body $Body -ContentType 'application/json' `
-                -Headers $Headers -SkipHttpErrorCheck -MaximumRedirection 0 -TimeoutSec ([Math]::Min(30, $Remaining))
+            $Response = Invoke-RegistrationHttp -Method $Method -Uri $Uri -Body $Body `
+                -Headers $Headers -TimeoutSeconds ([Math]::Min(30, $Remaining))
             $Status = [int]$Response.StatusCode
         }
-        catch [System.Net.Http.HttpRequestException], [System.Threading.Tasks.TaskCanceledException], [System.TimeoutException] {
+        catch [System.Net.Http.HttpRequestException], [System.OperationCanceledException], [System.TimeoutException] {
             $Status = 0
         }
         catch { throw "${Operation} request failed. Check endpoint connectivity and configuration; response details have been omitted." }

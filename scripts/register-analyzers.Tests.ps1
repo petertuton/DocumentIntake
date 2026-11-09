@@ -33,7 +33,7 @@ Describe 'Analyzer registration' -Tag 'Unit' {
             if ($args[2] -eq 'list') { return ConvertTo-Json -InputObject $script:Assignments -Depth 5 }
             if ($args[1] -eq 'get-access-token') { return 'fake-secret-token' }
         }
-        Mock Invoke-WebRequest {
+        Mock Invoke-RegistrationHttp {
             $script:Calls.Add(@{ Method = $Method; Uri = $Uri; Body = $Body })
             $Status = if ($script:StatusCodes.Count -gt 1) { $script:StatusCodes.Dequeue() } else { $script:StatusCodes.Peek() }
             return @{ StatusCode = $Status; Headers = @{}; Content = 'sensitive-response' }
@@ -50,7 +50,7 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         $script:Calls[1].Uri | Should -BeLike '*analyzers/document_intake_classifier?*&allowReplace=true'
         $script:Calls[2].Uri | Should -BeLike '*analyzers/document_intake_form_analyzer?*&allowReplace=true'
         ($script:Calls[2].Body | ConvertFrom-Json).models.embedding | Should -Be 'text-embedding-3-large'
-        Should -Invoke Invoke-WebRequest -Times 3 -Exactly -ParameterFilter { $MaximumRedirection -eq 0 -and $TimeoutSec -le 30 -and $Headers.Authorization -eq 'Bearer fake-secret-token' }
+        Should -Invoke Invoke-RegistrationHttp -Times 3 -Exactly -ParameterFilter { $TimeoutSeconds -le 30 -and $Headers.Authorization -eq 'Bearer fake-secret-token' }
         Should -Invoke az -Times 1 -Exactly -ParameterFilter { $args[1] -eq 'get-access-token' -and $args -contains '--subscription' -and $args -contains 'sub' }
         Should -Invoke az -Times 0 -ParameterFilter { $args -notcontains '--subscription' }
     }
@@ -66,13 +66,13 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         Mock az { $global:LASTEXITCODE = 1 } -ParameterFilter { $args[2] -eq 'list' }
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*Foundry role lookup failed*'
         Should -Invoke az -Times 0 -ParameterFilter { $args[2] -eq 'create' }
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
     }
 
     It 'Fails token acquisition without sending HTTP requests' {
         Mock az { $global:LASTEXITCODE = 1; 'do-not-log-this-token' } -ParameterFilter { $args[1] -eq 'get-access-token' }
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*token acquisition failed*'
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
     }
 
     It 'Reuses an inherited assignment' {
@@ -112,20 +112,20 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         $script:Parameters.Remove($Key)
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*required*'
         Should -Invoke az -Times 0
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
     }
 
     It 'Rejects a different CLI principal before any role or HTTP calls' {
         Mock az { $global:LASTEXITCODE = 0; '22222222-2222-2222-2222-222222222222' } -ParameterFilter { $args[0] -eq 'ad' }
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*object ID does not match*'
         Should -Invoke az -Times 0 -ParameterFilter { $args[0] -eq 'role' }
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
     }
 
     It 'Rejects directory lookup failure without leaking output' {
         Mock az { $global:LASTEXITCODE = 1; 'sensitive-directory-output' } -ParameterFilter { $args[0] -eq 'ad' }
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*object ID lookup failed*'
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
     }
 
     It 'Rejects wrong tenant, type, or endpoint before sending a bearer token' -ForEach @(
@@ -134,7 +134,7 @@ Describe 'Analyzer registration' -Tag 'Unit' {
     ) {
         $script:Parameters[$Key] = $Value
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
         Should -Invoke az -Times 0 -ParameterFilter { $args[2] -eq 'create' }
     }
 
@@ -142,7 +142,7 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         $script:Assignments = @()
         Mock az { $global:LASTEXITCODE = 1 } -ParameterFilter { $args[2] -eq 'create' }
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*RBAC administrator*'
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
     }
 
     It 'Accepts a concurrent matching assignment only after requerying' {
@@ -160,12 +160,12 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         $script:StatusCodes.Enqueue($_)
         $script:StatusCodes.Enqueue(200)
         Register-IntakeAnalyzer @script:Parameters
-        Should -Invoke Invoke-WebRequest -Times 4 -Exactly
+        Should -Invoke Invoke-RegistrationHttp -Times 4 -Exactly
         Should -Invoke Start-Sleep -Times 1 -Exactly
     }
 
     It 'Caps Retry-After before retrying throttled requests' {
-        Mock Invoke-WebRequest { @{ StatusCode = 429; Headers = @{ 'Retry-After' = @('99999') } } }
+        Mock Invoke-RegistrationHttp { @{ StatusCode = 429; Headers = @{ 'Retry-After' = @('99999') } } }
         { Invoke-RegistrationRequest -Method Patch -Uri 'https://test.invalid' -Body '{}' -Headers @{} -Operation test -MaxAttempts 2 } | Should -Throw '*bounded retries*'
         Should -Invoke Start-Sleep -Times 1 -Exactly -ParameterFilter { $Seconds -eq 60 }
     }
@@ -175,7 +175,7 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         $script:StatusCodes.Enqueue(401)
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*HTTP 401 (nonretryable)*'
         Should -Invoke az -Times 2 -Exactly -ParameterFilter { $args[1] -eq 'get-access-token' }
-        Should -Invoke Invoke-WebRequest -Times 2 -Exactly
+        Should -Invoke Invoke-RegistrationHttp -Times 2 -Exactly
     }
 
     It 'Fails immediately for permanent HTTP <_> without response or token disclosure' -ForEach @(301, 400, 404, 422) {
@@ -186,7 +186,7 @@ Describe 'Analyzer registration' -Tag 'Unit' {
             $_.Exception.Message | Should -Match 'nonretryable'
             $_.Exception.Message | Should -Not -Match 'fake-secret-token|sensitive-response'
         }
-        Should -Invoke Invoke-WebRequest -Times 1 -Exactly
+        Should -Invoke Invoke-RegistrationHttp -Times 1 -Exactly
         Should -Invoke Start-Sleep -Times 0
     }
 
@@ -194,14 +194,14 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         $script:StatusCodes.Clear()
         $script:StatusCodes.Enqueue(403)
         { Register-IntakeAnalyzer @script:Parameters } | Should -Throw '*bounded retries*'
-        Should -Invoke Invoke-WebRequest -Times 10 -Exactly
+        Should -Invoke Invoke-RegistrationHttp -Times 10 -Exactly
         Should -Invoke Start-Sleep -Times 9 -Exactly
-        Should -Invoke Invoke-WebRequest -Times 0 -ParameterFilter { $Method -eq 'Put' }
+        Should -Invoke Invoke-RegistrationHttp -Times 0 -ParameterFilter { $Method -eq 'Put' }
     }
 
     It 'Retries a transient transport failure' {
         $script:TransportCalls = 0
-        Mock Invoke-WebRequest {
+        Mock Invoke-RegistrationHttp {
             $script:TransportCalls++
             if ($script:TransportCalls -eq 1) { throw [System.Net.Http.HttpRequestException]::new('sensitive transport details') }
             @{ StatusCode = 200; Headers = @{} }
@@ -211,9 +211,9 @@ Describe 'Analyzer registration' -Tag 'Unit' {
     }
 
     It 'Stops at the operation deadline without issuing another request' {
-        Mock Invoke-WebRequest { throw 'A request should not start with less than one second remaining.' }
+        Mock Invoke-RegistrationHttp { throw 'A request should not start with less than one second remaining.' }
         { Invoke-RegistrationRequest -Method Patch -Uri 'https://test.invalid' -Body '{}' -Headers @{} -Operation test -TimeoutSeconds 1 } | Should -Throw '*bounded retries*'
-        Should -Invoke Invoke-WebRequest -Times 0
+        Should -Invoke Invoke-RegistrationHttp -Times 0
     }
 
     It 'Never logs bearer tokens or response bodies on retry exhaustion' {
@@ -224,5 +224,61 @@ Describe 'Analyzer registration' -Tag 'Unit' {
         try { Register-IntakeAnalyzer @script:Parameters }
         catch { $script:Messages.Add($_.Exception.Message) }
         ($script:Messages -join "`n") | Should -Not -Match 'fake-secret-token|sensitive-response'
+    }
+}
+
+Describe 'Bounded HTTP transport' -Tag 'Unit' {
+    BeforeAll {
+        if (-not ('IntakeTestHandler' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+public sealed class IntakeTestHandler : HttpMessageHandler
+{
+    public bool StallHeaders { get; set; }
+    public bool BodyRead { get; set; }
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    {
+        if (StallHeaders)
+        {
+            var pending = new TaskCompletionSource<HttpResponseMessage>();
+            token.Register(() => pending.TrySetCanceled(token));
+            return pending.Task;
+        }
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new UnreadableContent(this) });
+    }
+    private sealed class UnreadableContent : HttpContent
+    {
+        private readonly IntakeTestHandler owner;
+        public UnreadableContent(IntakeTestHandler handler) { owner = handler; }
+        protected override bool TryComputeLength(out long length) { length = 0; return false; }
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext context)
+        {
+            owner.BodyRead = true;
+            throw new InvalidOperationException("Response bodies must not be consumed.");
+        }
+    }
+}
+'@
+        }
+    }
+
+    It 'Returns after headers without consuming a stalled or trickling response body' {
+        $Handler = [IntakeTestHandler]::new()
+        $Response = Invoke-RegistrationHttp -Method Patch -Uri 'https://test.invalid/' -Body '{}' -Headers @{} -TimeoutSeconds 1 -Handler $Handler
+        $Response.StatusCode | Should -Be 200
+        $Handler.BodyRead | Should -BeFalse
+    }
+
+    It 'Cancels a stalled headers request at its deadline' {
+        $Handler = [IntakeTestHandler]::new()
+        $Handler.StallHeaders = $true
+        $Clock = [Diagnostics.Stopwatch]::StartNew()
+        { Invoke-RegistrationHttp -Method Patch -Uri 'https://test.invalid/' -Body '{}' -Headers @{} -TimeoutSeconds 1 -Handler $Handler } | Should -Throw
+        $Clock.Elapsed.TotalSeconds | Should -BeLessThan 5
     }
 }
